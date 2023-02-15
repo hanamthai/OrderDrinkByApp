@@ -7,17 +7,26 @@ from datetime import timedelta
 import psycopg2  # pip install psycopg2
 import psycopg2.extras
 
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
 app = Flask(__name__)
 
-app.config['SECRET_KEY'] = 'drinkorderbyapp'
+# Setup the Flask-JWT-Extended extension
+app.config['JWT_SECRET_KEY'] = 'drinkorderbyapp'
+jwt = JWTManager(app)
 
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=1)
+app.config['SECRET_KEY'] = 'drinkorderbyapp'
+# app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=10)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
 CORS(app)
 
-DB_HOST = "localhost"
-DB_NAME = "Drink Order"
-DB_USER = "postgres"
-DB_PASS = "123"
+DB_HOST = "localhost"    # postgresql-hanamthai.alwaysdata.net
+DB_NAME = "Drink Order"  # hanamthai_drinkorder
+DB_USER = "postgres"     # hanamthai_admin
+DB_PASS = "123"          # 021101054
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -38,6 +47,9 @@ def home():
 # hashed = bcrypt.hashpw(_password.encode('utf-8'), bcrypt.gensalt())
 # print(type(hashed))
 # print(hashed)
+
+# Create a route to authenticate your users and return JWTs. The
+# create_access_token() function is used to actually generate the JWT.
 
 
 @app.route('/login', methods=['POST'])
@@ -63,7 +75,9 @@ def login():
             if bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
                 session['fullname'] = fullname
                 cursor.close()
-                return jsonify({'message': 'You are logged in successfully'})
+                # create token
+                access_token = create_access_token(identity=_phonenumber)
+                return jsonify(access_token=access_token)
             else:
                 resp = jsonify({'message': 'Bad Request - invalid password'})
                 resp.status_code = 400
@@ -117,6 +131,16 @@ def logout():
     if 'fullname' in session:
         session.pop('fullname', None)
     return jsonify({'message': 'You successfully logged out'})
+
+
+# Protect a route with jwt_required, which will kick out requests
+# without a valid JWT present.
+@app.route("/protected", methods=["GET"])
+@jwt_required()
+def protected():
+    # Access the identity of the current user with get_jwt_identity
+    current_user = get_jwt_identity()
+    return jsonify(logged_in_as=current_user), 200
 
 
 if __name__ == "__main__":
