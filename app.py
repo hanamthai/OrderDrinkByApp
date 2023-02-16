@@ -1,3 +1,5 @@
+# "orderdrink_api_flask_env\Scripts\activate" to activate enviroments of packet
+# "orderdrink_api_flask_env\Scripts\deactivate" to deactivate enviroments of packet
 # app.py
 from flask import Flask, jsonify, request, session
 import bcrypt
@@ -24,17 +26,17 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
 CORS(app)
 
 # Local
-# DB_HOST = "localhost"
-# DB_NAME = "Drink Order"
-# DB_USER = "postgres"
-# DB_PASS = "123"
+DB_HOST = "localhost"
+DB_NAME = "Drink Order"
+DB_USER = "postgres"
+DB_PASS = "123"
 
 
 # Public
-DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-DB_NAME = "hanamthai_drinkorder"
-DB_USER = "hanamthai_admin"
-DB_PASS = "021101054"
+# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+# DB_NAME = "hanamthai_drinkorder"
+# DB_USER = "hanamthai_admin"
+# DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -51,11 +53,12 @@ def home():
     #     return resp
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    sql = "SELECT * FROM drinks"
+    sql = "SELECT drinks.drinkid,drinkname,drinkimage,category,MIN(price),status FROM drinks INNER JOIN drinksize ON drinks.drinkid = drinksize.drinkid INNER JOIN sizes ON sizes.sizeid = drinksize.sizeid GROUP BY drinks.drinkid ORDER BY drinks.drinkid"
     cursor.execute(sql)
     row = cursor.fetchall()
+    cursor.close()
     all_drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
-                   'description': drink[3], 'category': drink[4], 'status': drink[5]} for drink in row]
+                'category': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
     return jsonify(all_drinks)
 
 
@@ -151,6 +154,23 @@ def protected():
     current_user = get_jwt_identity()
     return jsonify(logged_in_as=current_user), 200
 
+
+# drink detail
+@app.route('/home/<int:id>', methods=['GET'])
+def drinkdetail(id):
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    sql = "SELECT * FROM drinks WHERE drinkid = %s"
+    sql_where = (id,)
+
+    cursor.execute(sql, sql_where)
+    drink = cursor.fetchone()
+    cursor.close()
+    if drink:
+        return jsonify({'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
+                   'description': drink[3], 'category': drink[4], 'status': drink[5]})
+    else:
+        return jsonify({'message':'Item not found!'})
 
 if __name__ == "__main__":
     app.run()
