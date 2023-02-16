@@ -23,10 +23,18 @@ app.config['SECRET_KEY'] = 'drinkorderbyapp'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
 CORS(app)
 
-DB_HOST = "localhost"    # postgresql-hanamthai.alwaysdata.net
-DB_NAME = "Drink Order"  # hanamthai_drinkorder
-DB_USER = "postgres"     # hanamthai_admin
-DB_PASS = "123"          # 021101054
+# Local
+# DB_HOST = "localhost"
+# DB_NAME = "Drink Order"
+# DB_USER = "postgres"
+# DB_PASS = "123"
+
+
+# Public
+DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+DB_NAME = "hanamthai_drinkorder"
+DB_USER = "hanamthai_admin"
+DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -34,19 +42,22 @@ conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
 
 @app.route('/')
 def home():
-    # passhash = generate_password_hash("123456")
-    # print(passhash)
-    if 'fullname' in session:
-        fullname = session['fullname']
-        return jsonify({'message': 'You are already logged in', 'fullname': fullname})
-    else:
-        resp = jsonify({'message': 'Unauthorized'})
-        resp.status_code = 401
-        return resp
+    # if 'fullname' in session:
+    #     fullname = session['fullname']
+    #     return jsonify({'message': 'You are already logged in', 'fullname': fullname})
+    # else:
+    #     resp = jsonify({'message': 'Unauthorized'})
+    #     resp.status_code = 401
+    #     return resp
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-# hashed = bcrypt.hashpw(_password.encode('utf-8'), bcrypt.gensalt())
-# print(type(hashed))
-# print(hashed)
+    sql = "SELECT * FROM drinks"
+    cursor.execute(sql)
+    row = cursor.fetchall()
+    all_drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
+                   'description': drink[3], 'category': drink[4], 'status': drink[5]} for drink in row]
+    return jsonify(all_drinks)
+
 
 # Create a route to authenticate your users and return JWTs. The
 # create_access_token() function is used to actually generate the JWT.
@@ -59,8 +70,6 @@ def login():
     if 'phonenumber' in _json.keys() and 'password' in _json.keys():
         _phonenumber = _json['phonenumber']
         _password = _json['password']
-        # hashed = bcrypt.hashpw(_password.encode('utf-8'), bcrypt.gensalt())
-        # print(hashed.decode("utf-8"))
         # check user exists
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
