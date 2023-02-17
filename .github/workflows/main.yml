@@ -1,0 +1,79 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Deploy
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "master" branch
+  push:
+    branches: [ "master" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        go: [ '1.18' ]
+    name: Go ${{ matrix.go }}
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+      
+      - name: Create SSH key
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 400 ~/.ssh/id_rsa
+
+      - uses: chrnorm/deployment-action@v2
+        name: Create GitHub deployment
+        id: deployment
+        with:
+          token: '${{ github.token }}'
+          environment-url: https://shanenoi.alwaysdata.net/expense/api/v1/check-health/
+          environment: production
+
+      - name: Deploy Alwaysdata
+        run: |
+          rsync --checksum * hanamthai_admin@ssh-hanamthai.alwaysdata.net:/home/hanamthai/service/orderdrink
+
+      - name: Request Alwaysdata restart server
+        env:
+          ALWAYSDATA_API_KEY: ${{ secrets.ALWAYSDATA_API_KEY }}
+          ALWAYSDATA_SERVER_ID: ${{ secrets.ALWAYSDATA_SERVER_ID }}
+        run: |
+          curl --basic "https://api.alwaysdata.com/v1/site/$ALWAYSDATA_SERVER_ID/restart" \
+                -X POST \
+                --user "$ALWAYSDATA_API_KEY:"
+
+      - name: Update deployment status (success)
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          #  environment-url -> var
+          environment-url: https://shanenoi.alwaysdata.net/expense/api/v1/check-health
+          state: 'success'
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+
+      - name: Update deployment status (failure)
+        if: failure()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          environment-url: https://shanenoi.alwaysdata.net/expense/api/v1/check-health
+          state: 'failure'
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
