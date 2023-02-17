@@ -21,7 +21,7 @@ app.config['JWT_SECRET_KEY'] = 'drinkorderbyapp'
 jwt = JWTManager(app)
 
 app.config['SECRET_KEY'] = 'drinkorderbyapp'
-# app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=10)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=60)
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
 CORS(app)
 
@@ -44,13 +44,6 @@ conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
 
 @app.route('/')
 def home():
-    # if 'fullname' in session:
-    #     fullname = session['fullname']
-    #     return jsonify({'message': 'You are already logged in', 'fullname': fullname})
-    # else:
-    #     resp = jsonify({'message': 'Unauthorized'})
-    #     resp.status_code = 401
-    #     return resp
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     # sql = "SELECT drinks.drinkid,drinkname,drinkimage,category,MIN(price),status FROM drinks INNER JOIN drinksize ON drinks.drinkid = drinksize.drinkid INNER JOIN sizes ON sizes.sizeid = drinksize.sizeid GROUP BY drinks.drinkid ORDER BY drinks.drinkid"
@@ -71,7 +64,7 @@ def home():
     cursor.close()
     all_drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
                 'category': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
-    return jsonify(all_drinks)
+    return jsonify(all_drinks=all_drinks)
 
 
 # Create a route to authenticate your users and return JWTs. The
@@ -97,10 +90,10 @@ def login():
             fullname = row['fullname']
             password_hash = row['password']
             if bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
-                session['fullname'] = fullname
                 cursor.close()
                 # create token
                 access_token = create_access_token(identity=_phonenumber)
+                session['access_token'] = access_token
                 return jsonify(access_token=access_token)
             else:
                 resp = jsonify({'message': 'Bad Request - invalid password'})
@@ -152,8 +145,8 @@ def register():
 
 @app.route('/logout', methods=['POST'])
 def logout():
-    if 'fullname' in session:
-        session.pop('fullname', None)
+    if 'access_token' in session:
+        session.pop('access_token', None)
     return jsonify({'message': 'You successfully logged out'})
 
 
@@ -173,16 +166,25 @@ def drinkdetail(id):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     sql = "SELECT * FROM drinks WHERE drinkid = %s"
-    sql_where = (id,)
 
     # Column contains topping's name and price of a drink
     sql_topping = "select t.toppingid,nametopping,price from drinks as d inner join drinktopping as dt on dt.drinkid = d.drinkid inner join toppings as t on t.toppingid = dt.toppingid where d.drinkid = %s"
 
     # # Column contains size's name and price of a drink
-    # select namesize,price from drinks as d
-    # inner join drinksize as ds on ds.drinkid = d.drinkid
-    # inner join sizes as s on s.sizeid = ds.sizeid
-    # where d.drinkid = 3
+    sql_size = """ 
+        select 
+            s.sizeid,namesize,price from drinks as d
+        inner join 
+            drinksize as ds 
+        on 
+            ds.drinkid = d.drinkid
+        inner join 
+            sizes as s 
+        on s.sizeid = ds.sizeid
+        where d.drinkid = %s
+        """
+
+    sql_where = (id,)
 
     cursor.execute(sql, sql_where)
     drink = cursor.fetchone()
@@ -190,12 +192,17 @@ def drinkdetail(id):
     cursor.execute(sql_topping,sql_where)
     topping = cursor.fetchall()
 
-    all_info = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
-                   'description': drink[3], 'category': drink[4], 'status': drink[5]},{"topping":{"toppingid":i[0],"nametopping":i[1],"pricetopping":i[2]} for i in topping}]
+    cursor.execute(sql_size,sql_where)
+    size = cursor.fetchall()
+
+    _drink = {'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
+                   'description': drink[3], 'category': drink[4], 'status': drink[5]}
+    _topping = [{"toppingid":i[0],"nametopping":i[1],"pricetopping":i[2]} for i in topping]
+    _size = [{"sizeid":j[0],"namesize":j[1],"price":j[2]} for j in size]
     
     cursor.close()
     if drink:
-        return jsonify(all_info)
+        return jsonify(drink=_drink,topping=_topping,size=_size)
     else:
         return jsonify({'message':'Item not found!'})
 
