@@ -15,10 +15,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        go: [ '1.18' ]
-    name: Go ${{ matrix.go }}
+    name: Deploy Python Server
     steps:
       - uses: actions/checkout@v2
       
@@ -38,13 +35,6 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 400 ~/.ssh/id_rsa
 
-      - uses: chrnorm/deployment-action@v2
-        name: Create GitHub deployment
-        id: deployment
-        with:
-          token: '${{ github.token }}'
-          environment-url: https://shanenoi.alwaysdata.net/expense/api/v1/check-health/
-          environment: production
 
       - name: Deploy Alwaysdata
         run: |
@@ -58,22 +48,3 @@ jobs:
           curl --basic "https://api.alwaysdata.com/v1/site/$ALWAYSDATA_SERVER_ID/restart" \
                 -X POST \
                 --user "$ALWAYSDATA_API_KEY:"
-
-      - name: Update deployment status (success)
-        if: success()
-        uses: chrnorm/deployment-status@v2
-        with:
-          token: '${{ github.token }}'
-          #  environment-url -> var
-          environment-url: https://shanenoi.alwaysdata.net/expense/api/v1/check-health
-          state: 'success'
-          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
-
-      - name: Update deployment status (failure)
-        if: failure()
-        uses: chrnorm/deployment-status@v2
-        with:
-          token: '${{ github.token }}'
-          environment-url: https://shanenoi.alwaysdata.net/expense/api/v1/check-health
-          state: 'failure'
-          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
