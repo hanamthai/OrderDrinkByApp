@@ -26,17 +26,17 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
 CORS(app)
 
 # Local
-DB_HOST = "localhost"
-DB_NAME = "Drink Order"
-DB_USER = "postgres"
-DB_PASS = "123"
+# DB_HOST = "localhost"
+# DB_NAME = "Drink Order"
+# DB_USER = "postgres"
+# DB_PASS = "123"
 
 
 # Public
-# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-# DB_NAME = "hanamthai_drinkorder"
-# DB_USER = "hanamthai_admin"
-# DB_PASS = "021101054"
+DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+DB_NAME = "hanamthai_drinkorder"
+DB_USER = "hanamthai_admin"
+DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -53,7 +53,19 @@ def home():
     #     return resp
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    sql = "SELECT drinks.drinkid,drinkname,drinkimage,category,MIN(price),status FROM drinks INNER JOIN drinksize ON drinks.drinkid = drinksize.drinkid INNER JOIN sizes ON sizes.sizeid = drinksize.sizeid GROUP BY drinks.drinkid ORDER BY drinks.drinkid"
+    # sql = "SELECT drinks.drinkid,drinkname,drinkimage,category,MIN(price),status FROM drinks INNER JOIN drinksize ON drinks.drinkid = drinksize.drinkid INNER JOIN sizes ON sizes.sizeid = drinksize.sizeid GROUP BY drinks.drinkid ORDER BY drinks.drinkid"
+    sql = """
+    SELECT
+        drinks.drinkid, drinkname, drinkimage,
+        category, MIN(price), status
+    FROM drinks
+    INNER JOIN drinksize
+        ON drinks.drinkid = drinksize.drinkid
+    INNER JOIN sizes
+        ON sizes.sizeid = drinksize.sizeid
+    GROUP BY drinks.drinkid
+    ORDER BY drinks.drinkid
+    """
     cursor.execute(sql)
     row = cursor.fetchall()
     cursor.close()
@@ -163,12 +175,27 @@ def drinkdetail(id):
     sql = "SELECT * FROM drinks WHERE drinkid = %s"
     sql_where = (id,)
 
+    # Column contains topping's name and price of a drink
+    sql_topping = "select t.toppingid,nametopping,price from drinks as d inner join drinktopping as dt on dt.drinkid = d.drinkid inner join toppings as t on t.toppingid = dt.toppingid where d.drinkid = %s"
+
+    # # Column contains size's name and price of a drink
+    # select namesize,price from drinks as d
+    # inner join drinksize as ds on ds.drinkid = d.drinkid
+    # inner join sizes as s on s.sizeid = ds.sizeid
+    # where d.drinkid = 3
+
     cursor.execute(sql, sql_where)
     drink = cursor.fetchone()
+
+    cursor.execute(sql_topping,sql_where)
+    topping = cursor.fetchall()
+
+    all_info = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
+                   'description': drink[3], 'category': drink[4], 'status': drink[5]},{"topping":{"toppingid":i[0],"nametopping":i[1],"pricetopping":i[2]} for i in topping}]
+    
     cursor.close()
     if drink:
-        return jsonify({'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
-                   'description': drink[3], 'category': drink[4], 'status': drink[5]})
+        return jsonify(all_info)
     else:
         return jsonify({'message':'Item not found!'})
 
