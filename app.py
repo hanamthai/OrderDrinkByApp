@@ -43,7 +43,7 @@ conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
 
 
-@app.route('/')
+@app.route('/drink')
 def home():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -51,21 +51,22 @@ def home():
     sql = """
     SELECT
         drinks.drinkid, drinkname, drinkimage,
-        category, MIN(price), status
+        categoryid, MIN(price), status
     FROM drinks
     INNER JOIN drinksize
         ON drinks.drinkid = drinksize.drinkid
     INNER JOIN sizes
         ON sizes.sizeid = drinksize.sizeid
+    WHERE status = 'Available'
     GROUP BY drinks.drinkid
     ORDER BY drinks.drinkid
     """
     cursor.execute(sql)
     row = cursor.fetchall()
     cursor.close()
-    all_drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
-                'category': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
-    return jsonify(all_drinks=all_drinks)
+    drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
+                'categoryid': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
+    return jsonify(drinks=drinks)
 
 
 # Create a route to authenticate your users and return JWTs. The
@@ -166,7 +167,7 @@ def protected():
 
 
 # drink detail
-@app.route('/home/<int:id>', methods=['GET'])
+@app.route('/drink/<int:id>', methods=['GET'])
 def drinkdetail(id):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -201,7 +202,7 @@ def drinkdetail(id):
     size = cursor.fetchall()
 
     _drink = {'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
-                   'description': drink[3], 'category': drink[4], 'status': drink[5]}
+                   'description': drink[3],'status': drink[4],'categoryid':drink[5]}
     _topping = [{"toppingid":i[0],"nametopping":i[1],"pricetopping":i[2]} for i in topping]
     _size = [{"sizeid":j[0],"namesize":j[1],"price":j[2]} for j in size]
     
@@ -212,126 +213,39 @@ def drinkdetail(id):
         return jsonify({'message':'Item not found!'})
 
 
-# add item to the items table
-# add a record in items table when the user adds an item to the cart
-# after then I check the order table that a record has the status "Initialize"
-# add orderid and orderid on a itemorder table. 
-@app.route('/additemtocart', methods=['POST'])
+# category info
+@app.route('/drink/category', methods=['GET'])
+def category_info():
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    sql = """
+    SELECT * FROM categories
+    """
+    cursor.execute(sql)
+    row = cursor.fetchall()
+    categories = [{'categoryid': category[0], 'categoryname': category[1]} for category in row]
+    cursor.close()
+    return jsonify(categories=categories)
+
+
+# user infomation
+@app.route('/user_info', methods=['GET'])
 @jwt_required()
-def additemtocart():
-    # Check autherization
-    _userid = get_jwt_identity() #userid
-    # Get data request
-    _json = request.json
-    _drinkid = _json['drinkid']
-    _price = _json['price']
-    _itemquantity = _json['itemquantity']
-    _sizeid = _json['sizeid']
-    # INSERT ITEM TO THE ITEMS TABLE
+def user_info():
+    userid = get_jwt_identity()
+
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     sql = """
-    INSERT INTO 
-        items(drinkid,price,itemquantity,sizeid)
-    VALUES(%s,%s,%s,%s)
-    RETURNING itemid
+    SELECT * FROM users WHERE userid = %s
     """
-    #itemid created auto so I get itemid
-    sql_where = (_drinkid,_price,_itemquantity,_sizeid)
+    sql_where = (userid,)
     cursor.execute(sql,sql_where)
     row = cursor.fetchone()
-    _itemid = row[0]
-    conn.commit()
-    cursor.close()
-    # Check if record has "Initialized" status in the orders table
-    # if a record exists then I take orderid and then I add it with itemid to the itemorder table.
-    # if no record exists then I will create a record to the order table and and repeat the steps above
-    _orderid = check_status_initialize(_userid)
-    if _orderid:
-        add_itemorder(_orderid,_itemid)
-    else:
-        _orderid_new = create_status_initialize(_userid)
-        add_itemorder(_orderid_new,_itemid)
-    return jsonify({'message': 'Added to cart!'})
+    print(type(row))
+    user = {'userid':row[0],'phonenumber':row[1],'password':row[2],'fullname':row[3],'rolename':row[4],'address':row[5]}
+    return jsonify(user=user)    
 
-
-
-def check_status_initialize(userid):
-    try:
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        sql_check_initialize = """
-        SELECT orderid FROM users
-        INNER JOIN 
-            orders
-        ON
-            users.userid = orders.userid
-        WHERE status = 'Initialize' AND users.userid = '%s'
-        """
-        sql_where = (userid,)
-        cursor.execute(sql_check_initialize,sql_where)
-        row = cursor.fetchone()
-        cursor.close()
-        if row:
-            return row[0] # orderid
-        return 0 # NO
-    except:
-        resp = jsonify({"message":"Error check status initialize!"})
-        resp.status_code = 501
-        return resp
-
-def create_status_initialize(userid):
-    try:
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        # Get info default of user to add to orders table, user can change it.
-        sql_get_info_user = """
-        SELECT *,LOCALTIMESTAMP FROM users WHERE userid = '%s'
-        """
-        sql_where = (userid,)
-        cursor.execute(sql_get_info_user,sql_where)
-        row = cursor.fetchone()
-
-        address = row['address']
-        phonenumber = row['phonenumber']
-        status = 'Initialize'
-        orderdate = row['localtimestamp']
-
-        # insert user info data to orders table.
-        sql_create_status_initialize = """
-        INSERT INTO 
-            orders(userid,totalprice,address,phonenumber,status,orderdate)
-        VALUES(%s,%s,%s,%s,%s,%s)
-        RETURNING orderid
-        """
-        sql_where = (userid,0,address,phonenumber,status,orderdate)
-        cursor.execute(sql_create_status_initialize,sql_where)
-        row = cursor.fetchone()
-        _orderid = row[0]
-        conn.commit()
-        cursor.close()
-        return _orderid
-    except:
-        resp = jsonify({"message":"Unable to add data to orders table!"})
-        resp.status_code = 501
-        return resp
-
-
-def add_itemorder(_orderid,_itemid):
-    try:
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        sql_add_itemorder = """
-        INSERT INTO 
-            itemorder(orderid,itemid)
-        VALUES(%s,%s)
-        """
-        sql_where = (_orderid,_itemid)
-        cursor.execute(sql_add_itemorder,sql_where)
-        conn.commit()
-        cursor.close()
-        return 0
-    except:
-        resp = jsonify({"message":"Unable to add data to itemorder table!"})
-        resp.status_code = 501
-        return resp
-        
+    
     
 
 if __name__ == "__main__":
