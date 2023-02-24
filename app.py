@@ -228,7 +228,7 @@ def category_info():
     return jsonify(categories=categories)
 
 
-# user infomation
+# get user information and change user information
 @app.route('/userInfo', methods=['GET','PUT'])
 @jwt_required()
 def user_info():
@@ -270,6 +270,58 @@ def user_info():
     resp.status_code = 501
     return resp
     
+
+# add and change topping
+@app.route('/topping',methods=['POST','PUT'])
+@jwt_required()
+def addAndChangeTopping():
+    info = get_jwt()
+    userid = info['sub']
+    rolename = info['rolename']
+    if rolename == 'admin':
+        if request.method == 'POST':
+            _json = request.json
+            _nametopping = _json['nametopping']
+            _price = _json['price']
+
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            sql = """
+            INSERT INTO toppings(nametopping,price) VALUES(%s,%s)
+            """
+            sql_where = (_nametopping,_price)
+            cursor.execute(sql,sql_where)
+            conn.commit()
+            cursor.close()
+            return jsonify({"message":"Added topping!"})
+
+        elif request.method == 'PUT':
+            _json = request.json
+            _toppingid = _json['toppingid']
+            _nametopping = _json['nametopping']
+            _price = _json['price']
+            
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            sql = """
+            UPDATE toppings
+            SET nametopping = %s,
+                price = %s
+            WHERE toppingid = %s
+            """
+            sql_where = (_nametopping,_price,_toppingid)
+            cursor.execute(sql,sql_where)
+            conn.commit()
+            cursor.close()
+            return jsonify({"message":"Updated topping!"})
+
+    else:
+        return jsonify({"message":"You are not authorized!"})
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     app.run()
