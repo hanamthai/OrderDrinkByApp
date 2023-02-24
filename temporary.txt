@@ -71,17 +71,17 @@ else:
     [
         {
             "drinkid": 1,
-            "itemquantity": 2,
             "price": "55000",
+            "itemquantity": 2,
             "sizeid": 1,
-            "topping": [1,2,3]
+            "toppingid": [1,2,3]
         },
         {
             "drinkid": 2,
             "itemquantity": 1,
             "price": "20000"
             "sizeid": 1,
-            "topping": []
+            "toppingid": []
         }
     ]
 }

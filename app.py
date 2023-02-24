@@ -88,12 +88,12 @@ def login():
 
         cursor.execute(sql, sql_where)
         row = cursor.fetchone()
+        cursor.close()
         if row:
             password_hash = row['password']
             userid = row['userid']
             rolename = row['rolename']
             if bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
-                cursor.close()
                 # create token
                 additional_claims = {"rolename":rolename}
                 access_token = create_access_token(identity=userid,additional_claims=additional_claims)
@@ -133,7 +133,6 @@ def register():
         # hash password to save into database (khi encode password để hash thì sau đó ta phải decode password để save cái decode password đó vào database)
         hashed = bcrypt.hashpw(_password.encode('utf-8'), bcrypt.gensalt())
         _password = hashed.decode('utf-8')
-        print(_password)
         # insert recored
         sql = "INSERT INTO users(phonenumber,password,fullname,rolename,address) VALUES(%s,%s,%s,%s,%s)"
         sql_where = (_phonenumber, _password, _fullname,
@@ -317,6 +316,73 @@ def addAndChangeTopping():
         return jsonify({"message":"You are not authorized!"})
 
 
+# create order
+@app.route('/order',methods = ['POST'])
+@jwt_required()
+def createOrder():
+    userid = get_jwt_identity()
+
+    _json = request.json
+    _order = _json['order']
+    _item = _json['item']
+
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    # create order and get orderid
+    sql_create_order = """
+    INSERT INTO 
+        orders(userid,totalprice,address,phonenumber,note,status,orderdate)
+    VALUES(%s,%s,%s,%s,%s,'Preparing',LOCALTIMESTAMP)
+    RETURNING orderid
+    """
+    sql_where = (userid,_order[0],_order[1],_order[2],_order[3],_order[4])
+    cursor.execute(sql_create_order,sql_where)
+    row = cursor.fetchone()
+    orderid = row[0]
+    conn.commit()
+
+    # add record to items table and get itemid
+    # loop run, cause we have many item in a request
+    lst_itemid = []
+    for i in _item:
+        # we have to handling add record to items and itemtopping table
+        sql_add_item = """
+        INSERT INTO
+            items(drinkid,price,itemquantity,sizeid)
+        VALUES(%s,%s,%s,%s)
+        RETURNING itemid
+        """
+        sql_where = (i['drinkid'],i['price'],i['itemquantity'],i['sizeid'])
+        cursor.execute(sql_add_item,sql_where)
+        row = cursor.fetchone()
+        conn.commit()
+        itemid = row[0]
+        lst_itemid.append(itemid)
+
+        # insert data to itemtopping table
+        for j in i['toppingid']:
+            sql_add_itemtopping = """
+            INSERT INTO
+                itemtopping(itemid,toppingid)
+            VALUES(%s,%s)
+            """
+            sql_where = (itemid,j)
+            cursor.execute(sql_add_itemtopping,sql_where)
+            conn.commit()
+
+    # insert data to itemorder
+    for i in lst_itemid:
+        sql_add_itemorder = """
+        INSERT INTO itemorder(orderid,itemid)
+        VALUES(%s,%s)
+        """
+        sql_where = (orderid,i)
+        cursor.execute(sql_add_itemorder,sql_where)
+        conn.commit()
+    
+    cursor.close()
+
+    return jsonify({"message":"Completed order! Your order are preparing!!!"})
+    
 
 
 
