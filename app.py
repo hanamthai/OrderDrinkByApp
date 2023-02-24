@@ -229,23 +229,46 @@ def category_info():
 
 
 # user infomation
-@app.route('/user_info', methods=['GET'])
+@app.route('/userInfo', methods=['GET','PUT'])
 @jwt_required()
 def user_info():
     userid = get_jwt_identity()
 
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    sql = """
-    SELECT * FROM users WHERE userid = %s
-    """
-    sql_where = (userid,)
-    cursor.execute(sql,sql_where)
-    row = cursor.fetchone()
-    print(type(row))
-    user = {'userid':row[0],'phonenumber':row[1],'password':row[2],'fullname':row[3],'rolename':row[4],'address':row[5]}
-    return jsonify(user=user)    
-
+    if request.method == 'GET':
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        sql = """
+        SELECT * FROM users WHERE userid = %s
+        """
+        sql_where = (userid,)
+        cursor.execute(sql,sql_where)
+        row = cursor.fetchone()
+        print(type(row))
+        user = {'userid':row[0],'phonenumber':row[1],'password':row[2],'fullname':row[3],'rolename':row[4],'address':row[5]}
+        return jsonify(user=user)
     
+    elif request.method == 'PUT':
+        _json = request.json
+        _phonenumber = _json['phonenumber']
+        _fullname = _json['fullname']
+        _address = _json['address']
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        sql = """
+        UPDATE users 
+        SET phonenumber = %s,
+            fullname = %s,
+            address = %s
+        WHERE userid = %s
+        """
+        sql_where = (_phonenumber,_fullname,_address,userid)
+        cursor.execute(sql,sql_where)
+        conn.commit()
+        cursor.close()
+        return jsonify({"message":"User information updated!"})
+    
+    resp = jsonify({"message":"Error user information!"})
+    resp.status_code = 501
+    return resp
     
 
 if __name__ == "__main__":

@@ -58,6 +58,36 @@ else:
 
 
 
+{
+    "order":
+    {
+        "userid": 1,
+        "totalprice": 100000,
+        "address": "97, Man Thiện, phường Hiệp Phú, thành phố Thủ Đức."
+        "phonenumber": "0383292556",
+        "note": "Ít đá, nhiều sữa."
+    },
+    "item":
+    [
+        {
+            "drinkid": 1,
+            "itemquantity": 2,
+            "price": "55000"
+            "sizeid": 1,
+            "topping": [1,2,3]
+        },
+        {
+            "drinkid": 2,
+            "itemquantity": 1,
+            "price": "20000"
+            "sizeid": 1,
+            "topping": []
+        }
+    ]
+}
+
+
+
 
 
 
