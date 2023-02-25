@@ -271,11 +271,10 @@ def user_info():
     
 
 # add and change topping
-@app.route('/topping',methods=['POST','PUT'])
+@app.route('/admin/topping',methods=['POST','PUT'])
 @jwt_required()
 def addAndChangeTopping():
     info = get_jwt()
-    userid = info['sub']
     rolename = info['rolename']
     if rolename == 'admin':
         if request.method == 'POST':
@@ -384,7 +383,49 @@ def createOrder():
     return jsonify({"message":"Completed order! Your order are preparing!!!"})
     
 
+# add and update size
+@app.route('/admin/size', methods=['POST','PUT'])
+@jwt_required()
+def addAndUpdateSize():
+    info = get_jwt()
+    rolename = info['rolename']
+    if rolename == 'admin':
+        if request.method == 'POST':
+            _json = request.json()
+            _namesize = _json['namesize']
+            _price = _json['price']
 
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            sql_add_size = """
+            INSERT INTO sizes(namesize,price)
+            VALUES(%s,%s)
+            """
+            sql_where = (_namesize,_price)
+            cursor.execute(sql_add_size,sql_where)
+            conn.commit()
+            cursor.close()
+            return jsonify({"message":"Added size!"})
+        
+        elif request.method == 'PUT':
+            _json = request.json()
+            _sizeid = _json['sizeid']
+            _namesize = _json['namesize']
+            _price = _json['price']
+
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            sql_update_size = """
+            UPDATE sizes
+            SET namesize = %s,
+                price = %s
+            WHERE sizeid = %s
+            """
+            sql_where = (_namesize,_price,_sizeid)
+            cursor.execute(sql_update_size,sql_where)
+            conn.commit()
+            cursor.close()
+            return jsonify({"message":"Updated size!"})
+    else:
+        return jsonify({"message":"You are not authorized!"})
 
 
 
