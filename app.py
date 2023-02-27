@@ -333,7 +333,7 @@ def createOrder():
     VALUES(%s,%s,%s,%s,%s,'Preparing',LOCALTIMESTAMP)
     RETURNING orderid
     """
-    sql_where = (userid,_order[0],_order[1],_order[2],_order[3],_order[4])
+    sql_where = (userid,_order['totalprice'],_order['address'],_order['phonenumber'],_order['note'])
     cursor.execute(sql_create_order,sql_where)
     row = cursor.fetchone()
     orderid = row[0]
@@ -427,6 +427,30 @@ def addAndUpdateSize():
     else:
         return jsonify({"message":"You are not authorized!"})
 
+@app.route('/admin/order/update',methods=['PUT'])
+@jwt_required()
+def orderStatusUpdate():
+    info = get_jwt()
+    rolename = info['rolename']
+    
+    if rolename == 'admin':
+        _json = request.json
+        orderid = _json['orderid']
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        sql = """
+        UPDATE orders
+        SET status = 'Delivering'
+        WHERE orderid = %s
+        """
+        sql_where = (orderid,)
+        cursor.execute(sql,sql_where)
+        conn.commit()
+        cursor.close()
+        return jsonify({"message":"Updated order status to 'Delivering'!"})
+    
+    else:
+        return jsonify({"message":"You are not authorized!"})
 
 
 
