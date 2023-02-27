@@ -454,5 +454,25 @@ def orderStatusUpdate():
 
 
 
+@app.route('/order/update',methods=['PUT'])
+@jwt_required()
+def userConfirmCompletedOrder():
+    _json = request.json
+    orderid = _json['orderid']
+
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    sql = """
+    UPDATE orders
+    SET status = 'Completed'
+    WHERE orderid = %s
+    """
+    sql_where = (orderid,)
+    cursor.execute(sql,sql_where)
+    conn.commit()
+    cursor.close()
+    return jsonify({"message":"Updated order status to 'Completed'!"})
+
+
+
 if __name__ == "__main__":
     app.run()
