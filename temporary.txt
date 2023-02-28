@@ -61,7 +61,6 @@ else:
 {
     "order":
     {
-        "userid": 1,
         "totalprice": 100000,
         "address": "97, Man Thiện, phường Hiệp Phú, thành phố Thủ Đức",
         "phonenumber": "0383292556",
@@ -71,15 +70,15 @@ else:
     [
         {
             "drinkid": 1,
-            "price": "55000",
+            "price": 55000,
             "itemquantity": 2,
             "sizeid": 1,
             "toppingid": [1,2,3]
         },
         {
             "drinkid": 2,
+            "price": 20000,
             "itemquantity": 1,
-            "price": "20000"
             "sizeid": 1,
             "toppingid": []
         }

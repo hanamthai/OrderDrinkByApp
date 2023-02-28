@@ -1,10 +1,12 @@
 # "orderdrink_api_flask_env\Scripts\activate" to activate enviroments of packet
 # "orderdrink_api_flask_env\Scripts\deactivate" to deactivate enviroments of packet
 # app.py
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, session, url_for
 import bcrypt
 from flask_cors import CORS  # pip install -U flask-cors
 from datetime import timedelta
+from flask_mail import Mail,Message
+import smtplib
 
 import psycopg2  # pip install psycopg2
 import psycopg2.extras
@@ -15,15 +17,27 @@ from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import get_jwt
 
+
+
 app = Flask(__name__)
 
 # Setup the Flask-JWT-Extended extension
 app.config['JWT_SECRET_KEY'] = 'drinkorderbyapp'
+app.config['JWT_TOKEN_LOCATION'] = 'headers'
 jwt = JWTManager(app)
 
 app.config['SECRET_KEY'] = 'drinkorderbyapp'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=60)
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
+# send email setup
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = 'noname09092001@gmail.com'
+app.config['MAIL_PASSWORD'] = 'ulbtjapttoblznip'
+mail = Mail(app)
+
 CORS(app)
 
 # Local
@@ -471,6 +485,74 @@ def userConfirmCompletedOrder():
     conn.commit()
     cursor.close()
     return jsonify({"message":"Updated order status to 'Completed'!"})
+
+
+
+@app.route('/resetPassword',methods = ['POST'])
+def resetRequest():
+    _json = request.json
+    _email = _json['email']
+    
+    # check email request has contained in the database
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    sql_check_email = """
+    SELECT userid FROM users
+    WHERE email = %s
+    """
+    sql_where = (_email,)
+    cursor.execute(sql_check_email,sql_where)
+    row = cursor.fetchone()
+    userid = row[0]
+    cursor.close()
+    
+    if userid:
+        sendEmail(userid,_email)
+        return jsonify({"message":"Hệ thống đã gửi cho bạn mail thông báo thay đổi mật khẩu. Hãy vào mail để kiểm tra!"})
+    else:
+        return jsonify({"message":"email ko ton tai"})
+
+
+def sendEmail(userid,_email):
+    token = create_access_token(identity=userid,expires_delta=timedelta(minutes=5))
+    msg = Message('Password Reset Request',recipients=[_email],sender='noreply@gmail.com')
+    
+    msg.body = f""" Để đặt lại mật khẩu trong ứng dụng đặt đồ uống. Hãy nhấn vào link dưới đây:
+
+    {url_for("verifyTokenEmail",jwt=token,_external=True)}
+    
+    Nếu bạn không phải là người gửi yêu cầu đổi mật khẩu. Hãy bỏ qua mail thông báo này.
+    """
+    mail.send(msg)
+
+
+#{{HOST}}/resetPassword/token?jwt=<Your token>
+@app.route('/resetPassword/token',methods=['POST','GET'])
+@jwt_required(locations="query_string")
+def verifyTokenEmail():
+    userid = get_jwt_identity()
+    if userid:
+        # hash password '123'
+        _password = '123'
+        hashed = bcrypt.hashpw(_password.encode('utf-8'), bcrypt.gensalt())
+        _password_hash = hashed.decode('utf-8')
+
+        # update password into database
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        sql_change_password_default = """
+        UPDATE users
+        SET password = %s
+        WHERE userid = %s
+        """
+        sql_where = (_password_hash,userid)
+        cursor.execute(sql_change_password_default,sql_where)
+        conn.commit()
+        cursor.close()
+
+        return jsonify({"message":"Your password changed to '123'!!!"})
+    else:
+        return jsonify({"message":"Account doesn't exist"})
+
+
 
 
 
