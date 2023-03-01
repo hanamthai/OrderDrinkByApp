@@ -6,7 +6,6 @@ import bcrypt
 from flask_cors import CORS  # pip install -U flask-cors
 from datetime import timedelta
 from flask_mail import Mail,Message
-import smtplib
 
 import psycopg2  # pip install psycopg2
 import psycopg2.extras
@@ -102,6 +101,7 @@ def login():
 
         cursor.execute(sql, sql_where)
         row = cursor.fetchone()
+        print(row)
         cursor.close()
         if row:
             password_hash = row['password']
@@ -114,15 +114,15 @@ def login():
                 session['access_token'] = access_token
                 return jsonify(access_token=access_token)
             else:
-                resp = jsonify({'message': 'Bad Request - invalid password'})
+                resp = jsonify({'message': 'Bad Request - Wrong password!'})
                 resp.status_code = 400
                 return resp
         else:
-            resp = jsonify({'message': 'Bad Request - invalid login name'})
+            resp = jsonify({'message': 'Bad Request - Your phone does not exist in the system!'})
             resp.status_code = 400
             return resp
     else:
-        resp = jsonify({'message': 'Bad Request - missing input'})
+        resp = jsonify({'message': 'Bad Request - Missing input!'})
         resp.status_code = 400
         return resp
 
@@ -255,8 +255,7 @@ def user_info():
         sql_where = (userid,)
         cursor.execute(sql,sql_where)
         row = cursor.fetchone()
-        print(type(row))
-        user = {'userid':row[0],'phonenumber':row[1],'password':row[2],'fullname':row[3],'rolename':row[4],'address':row[5]}
+        user = {'userid':row[0],'phonenumber':row[1],'password':row[2],'fullname':row[3],'rolename':row[4],'address':row[5],'email':row[6]}
         return jsonify(user=user)
     
     elif request.method == 'PUT':
@@ -441,6 +440,8 @@ def addAndUpdateSize():
     else:
         return jsonify({"message":"You are not authorized!"})
 
+
+
 @app.route('/admin/order/update',methods=['PUT'])
 @jwt_required()
 def orderStatusUpdate():
@@ -487,6 +488,43 @@ def userConfirmCompletedOrder():
     return jsonify({"message":"Updated order status to 'Completed'!"})
 
 
+@app.route('/changePassword',methods=['PUT'])
+@jwt_required()
+def changePassword():
+    userid = get_jwt_identity()
+
+    _json = request.json
+    _oldPassword = _json['oldpassword']
+    _newPassword = _json['newpassword']
+    # Confirm old password
+    cursor = conn.cursor(cursor_factory= psycopg2.extras.DictCursor)
+    sql_get_password = """
+    SELECT password FROM users
+    WHERE userid = %s
+    """
+    sql_where = (userid,)
+    cursor.execute(sql_get_password,sql_where)
+    row = cursor.fetchone()
+    print(row)
+    password_hash = row[0]
+    if bcrypt.checkpw(_oldPassword.encode('utf-8'),password_hash.encode('utf-8')):
+        # hash password
+        hashed = bcrypt.hashpw(_newPassword.encode('utf-8'),bcrypt.gensalt())
+        _newPassword = hashed.decode('utf-8')
+        
+        sql_change_password = """
+        UPDATE users
+        SET password = %s
+        WHERE userid = %s
+        """
+        sql_where = (_newPassword,userid)
+        cursor.execute(sql_change_password,sql_where)
+        conn.commit()
+        cursor.close()
+        return jsonify({"message":"Your password changed !!!"})
+    else:
+        return jsonify({"message":"Your old password is wrong"})
+
 
 @app.route('/resetPassword',methods = ['POST'])
 def resetRequest():
@@ -515,18 +553,16 @@ def resetRequest():
 def sendEmail(userid,_email):
     token = create_access_token(identity=userid,expires_delta=timedelta(minutes=5))
     msg = Message('Password Reset Request',recipients=[_email],sender='noreply@gmail.com')
-    
-    msg.body = f""" Để đặt lại mật khẩu trong ứng dụng đặt đồ uống. Hãy nhấn vào link dưới đây:
 
+    msg.body = f""" Để đặt lại mật khẩu trong ứng dụng đặt đồ uống. Hãy nhấn vào link dưới đây:
     {url_for("verifyTokenEmail",jwt=token,_external=True)}
-    
     Nếu bạn không phải là người gửi yêu cầu đổi mật khẩu. Hãy bỏ qua mail thông báo này.
     """
     mail.send(msg)
 
 
 #{{HOST}}/resetPassword/token?jwt=<Your token>
-@app.route('/resetPassword/token',methods=['POST','GET'])
+@app.route('/resetPassword/token',methods=['PUT'])
 @jwt_required(locations="query_string")
 def verifyTokenEmail():
     userid = get_jwt_identity()
