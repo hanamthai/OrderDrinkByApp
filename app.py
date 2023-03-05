@@ -40,17 +40,17 @@ mail = Mail(app)
 CORS(app)
 
 # Local
-DB_HOST = "localhost"
-DB_NAME = "Drink Order"
-DB_USER = "postgres"
-DB_PASS = "123"
+# DB_HOST = "localhost"
+# DB_NAME = "Drink Order"
+# DB_USER = "postgres"
+# DB_PASS = "123"
 
 
 # Public
-# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-# DB_NAME = "hanamthai_drinkorder"
-# DB_USER = "hanamthai_admin"
-# DB_PASS = "021101054"
+DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+DB_NAME = "hanamthai_drinkorder"
+DB_USER = "hanamthai_admin"
+DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -107,7 +107,10 @@ def login():
             password_hash = row['password']
             userid = row['userid']
             rolename = row['rolename']
-            if bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
+            status = row['status']
+            if status == 'inactive':
+                return jsonify({"message":"Your account is locked! You can contact with our employee to know reason!"})
+            elif bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
                 # create token
                 additional_claims = {"rolename":rolename}
                 access_token = create_access_token(identity=userid,additional_claims=additional_claims)
@@ -135,6 +138,7 @@ def register():
     _fullname = _json['fullname']
     _rolename = _json['rolename']
     _address = _json['address']
+    _email = _json['email']
 
     # INSERT user
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -148,9 +152,9 @@ def register():
         hashed = bcrypt.hashpw(_password.encode('utf-8'), bcrypt.gensalt())
         _password = hashed.decode('utf-8')
         # insert recored
-        sql = "INSERT INTO users(phonenumber,password,fullname,rolename,address) VALUES(%s,%s,%s,%s,%s)"
+        sql = "INSERT INTO users(phonenumber,password,fullname,rolename,address,email,status) VALUES(%s,%s,%s,%s,%s,%s,%s)"
         sql_where = (_phonenumber, _password, _fullname,
-                     _rolename, _address)
+                     _rolename, _address,_email,'action')
         cursor.execute(sql, sql_where)
         conn.commit()
         cursor.close()
@@ -552,7 +556,7 @@ def resetRequest():
 
 def sendEmail(userid,_email):
     token = create_access_token(identity=userid,expires_delta=timedelta(minutes=5))
-    msg = Message('Password Reset Request',recipients=[_email],sender='noreply@gmail.com')
+    msg = Message('YÊU CẦU ĐẶT LẠI MẬT KHẨU',recipients=[_email],sender='noreply@gmail.com')
 
     msg.body = f""" Để đặt lại mật khẩu trong ứng dụng đặt đồ uống. Hãy nhấn vào link dưới đây:
     {url_for("verifyTokenEmail",jwt=token,_external=True)}
@@ -562,7 +566,7 @@ def sendEmail(userid,_email):
 
 
 #{{HOST}}/resetPassword/token?jwt=<Your token>
-@app.route('/resetPassword/token',methods=['PUT'])
+@app.route('/resetPassword/token',methods=['PUT','GET'])
 @jwt_required(locations="query_string")
 def verifyTokenEmail():
     userid = get_jwt_identity()
