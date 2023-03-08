@@ -79,7 +79,9 @@ def home():
     cursor.close()
     drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
                 'categoryid': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
-    return jsonify(drinks=drinks)
+    resp = jsonify(drinks=drinks)
+    resp.status_code = 200
+    return resp
 
 
 # Create a route to authenticate your users and return JWTs. The
@@ -109,13 +111,17 @@ def login():
             rolename = row['rolename']
             status = row['status']
             if status == 'inactive':
-                return jsonify({"message":"Your account is locked! You can contact with our employee to know reason!"})
+                resp = jsonify({"message":"Locked - Your account is locked! You can contact with our employee to know reason!"})
+                resp.status_code = 423
+                return resp
             elif bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
                 # create token
                 additional_claims = {"rolename":rolename}
                 access_token = create_access_token(identity=userid,additional_claims=additional_claims)
                 session['access_token'] = access_token
-                return jsonify(access_token=access_token)
+                resp = jsonify(access_token=access_token)
+                resp.status_code = 200
+                return resp
             else:
                 resp = jsonify({'message': 'Bad Request - Wrong password!'})
                 resp.status_code = 400
@@ -157,17 +163,23 @@ def register():
         cursor.execute(sql, sql_where)
         conn.commit()
         cursor.close()
-        return jsonify({'message': 'You completed register!'})
+        resp = jsonify({'message': 'You completed register!'})
+        resp.status_code = 200
+        return resp
     else:
         cursor.close()
-        return jsonify({'message': 'Your phone or email already exists!'})
+        resp = jsonify({'message': 'Bad Request - Your phone or email already exists!'})
+        resp.status_code = 400
+        return resp
 
 
 @app.route('/logout', methods=['POST'])
 def logout():
     if 'access_token' in session:
         session.pop('access_token', None)
-    return jsonify({'message': 'You successfully logged out'})
+    resp =  jsonify({'message': 'You successfully logged out'})
+    resp.status_code = 200
+    return resp
 
 
 # Protect a route with jwt_required, which will kick out requests
@@ -179,7 +191,9 @@ def protected():
     claims = get_jwt()
     _userid = claims['sub']
     _rolename = claims['rolename']
-    return jsonify({"userid":_userid,"rolename":_rolename})
+    resp = jsonify({"userid":_userid,"rolename":_rolename})
+    resp.status_code = 200
+    return resp
 
 
 # drink detail
@@ -187,12 +201,25 @@ def protected():
 def drinkdetail(id):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    sql = "SELECT * FROM drinks WHERE drinkid = %s"
+    sql_drink = "SELECT * FROM drinks WHERE drinkid = %s and status = 'Available'"
 
     # Column contains topping's name and price of a drink
-    sql_topping = "select t.toppingid,nametopping,price from drinks as d inner join drinktopping as dt on dt.drinkid = d.drinkid inner join toppings as t on t.toppingid = dt.toppingid where d.drinkid = %s"
+    sql_topping = """
+    select 
+        t.toppingid,nametopping,price 
+    from drinks as d 
+    inner join 
+        drinktopping as dt 
+    on 
+        dt.drinkid = d.drinkid 
+    inner join 
+        toppings as t 
+    on 
+        t.toppingid = dt.toppingid 
+    where d.drinkid = %s
+    """
 
-    # # Column contains size's name and price of a drink
+    # Column contains size's name and price of a drink
     sql_size = """ 
         select 
             s.sizeid,namesize,price from drinks as d
@@ -207,26 +234,35 @@ def drinkdetail(id):
         """
 
     sql_where = (id,)
-
-    cursor.execute(sql, sql_where)
+    # drink
+    cursor.execute(sql_drink, sql_where)
     drink = cursor.fetchone()
-
+    if drink == None:
+        resp = jsonify({'message':'Not Found - Item not found!'})
+        resp.status_code = 404
+        return resp
+    _drink = {'drinkid': drink['drinkid'], 'drinkname': drink['drinkname'], 'drinkimage': drink['drinkimage'],
+                   'description': drink['description'],'status': drink['status'],'categoryid':drink['categoryid']}
+    # topping
     cursor.execute(sql_topping,sql_where)
     topping = cursor.fetchall()
-
+    if topping != None:
+        _topping = [{"toppingid": i['toppingid'], "nametopping": i['nametopping'], "price": i['price']} for i in topping]
+    else:
+        _topping = []
+    # size
     cursor.execute(sql_size,sql_where)
     size = cursor.fetchall()
-
-    _drink = {'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
-                   'description': drink[3],'status': drink[4],'categoryid':drink[5]}
-    _topping = [{"toppingid":i[0],"nametopping":i[1],"pricetopping":i[2]} for i in topping]
-    _size = [{"sizeid":j[0],"namesize":j[1],"price":j[2]} for j in size]
+    if size != None:
+        _size = [{"sizeid": j['sizeid'], "namesize": j['namesize'], "price": j['price']} for j in size]
+    else:
+        _size = []
     
     cursor.close()
-    if drink:
-        return jsonify(drink=_drink,topping=_topping,size=_size)
-    else:
-        return jsonify({'message':'Item not found!'})
+    resp = jsonify(drink=_drink,topping=_topping,size=_size)
+    resp.status_code = 200
+    return resp
+        
 
 
 # category info
@@ -241,7 +277,14 @@ def category_info():
     row = cursor.fetchall()
     categories = [{'categoryid': category[0], 'categoryname': category[1]} for category in row]
     cursor.close()
-    return jsonify(categories=categories)
+    if categories:
+        resp = jsonify(categories=categories)
+        resp.status_code = 200
+        return resp
+    else:
+        resp = jsonify({'message':'Not Found!'})
+        resp.status_code = 404
+        return resp
 
 
 # get user information and change user information
@@ -263,7 +306,14 @@ def user_info():
                 'fullname':row['fullname'],'rolename':row['rolename'],
                 'address':row['address'],'email':row['email']}
         cursor.close()
-        return jsonify(user=user)
+        if user:
+            resp = jsonify(user=user)
+            resp.status_code = 200
+            return resp
+        else:
+            resp = jsonify({"message": "Not Found!"})
+            resp.status_code = 404
+            return resp
     
     elif request.method == 'PUT':
         _json = request.json
@@ -280,10 +330,12 @@ def user_info():
         cursor.execute(sql,sql_where)
         conn.commit()
         cursor.close()
-        return jsonify({"message":"User information updated!"})
+        resp = jsonify({"message":"User information updated!"})
+        resp.status_code = 200
+        return resp
     
     cursor.close()
-    resp = jsonify({"message":"Error user information!"})
+    resp = jsonify({"message":"Not Implemented - Server doesn't undertand your request method"})
     resp.status_code = 501
     return resp
     
@@ -308,7 +360,9 @@ def addAndChangeTopping():
             cursor.execute(sql,sql_where)
             conn.commit()
             cursor.close()
-            return jsonify({"message":"Added topping!"})
+            resp = jsonify({"message":"Added topping!"})
+            resp.status_code = 200
+            return resp
 
         elif request.method == 'PUT':
             _json = request.json
@@ -327,10 +381,14 @@ def addAndChangeTopping():
             cursor.execute(sql,sql_where)
             conn.commit()
             cursor.close()
-            return jsonify({"message":"Updated topping!"})
+            resp = jsonify({"message":"Updated topping!"})
+            resp.status_code = 200
+            return resp 
 
     else:
-        return jsonify({"message":"You are not authorized!"})
+        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
+        resp.status_code = 401
+        return resp
 
 
 # create order
@@ -342,64 +400,69 @@ def createOrder():
     _json = request.json
     _order = _json['order']
     _item = _json['item']
-
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # create order and get orderid
-    sql_create_order = """
-    INSERT INTO 
-        orders(userid,totalprice,address,phonenumber,note,status,orderdate)
-    VALUES(%s,%s,%s,%s,%s,'Preparing',LOCALTIMESTAMP)
-    RETURNING orderid
-    """
-    sql_where = (userid,_order['totalprice'],_order['address'],_order['phonenumber'],_order['note'])
-    cursor.execute(sql_create_order,sql_where)
-    row = cursor.fetchone()
-    orderid = row[0]
-    conn.commit()
-
-    # add record to items table and get itemid
-    # loop run, cause we have many item in a request
-    lst_itemid = []
-    for i in _item:
-        # we have to handling add record to items and itemtopping table
-        sql_add_item = """
-        INSERT INTO
-            items(drinkid,price,itemquantity,sizeid)
-        VALUES(%s,%s,%s,%s)
-        RETURNING itemid
+    try:
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        # create order and get orderid
+        sql_create_order = """
+        INSERT INTO 
+            orders(userid,totalprice,address,phonenumber,note,status,orderdate)
+        VALUES(%s,%s,%s,%s,%s,'Preparing',LOCALTIMESTAMP)
+        RETURNING orderid
         """
-        sql_where = (i['drinkid'],i['price'],i['itemquantity'],i['sizeid'])
-        cursor.execute(sql_add_item,sql_where)
+        sql_where = (userid,_order['totalprice'],_order['address'],_order['phonenumber'],_order['note'])
+        cursor.execute(sql_create_order,sql_where)
         row = cursor.fetchone()
+        orderid = row[0]
         conn.commit()
-        itemid = row[0]
-        lst_itemid.append(itemid)
 
-        # insert data to itemtopping table
-        for j in i['toppingid']:
-            sql_add_itemtopping = """
+        # add record to items table and get itemid
+        # loop run, cause we have many item in a request
+        lst_itemid = []
+        for i in _item:
+            # we have to handling add record to items and itemtopping table
+            sql_add_item = """
             INSERT INTO
-                itemtopping(itemid,toppingid)
+                items(drinkid,price,itemquantity,sizeid)
+            VALUES(%s,%s,%s,%s)
+            RETURNING itemid
+            """
+            sql_where = (i['drinkid'],i['price'],i['itemquantity'],i['sizeid'])
+            cursor.execute(sql_add_item,sql_where)
+            row = cursor.fetchone()
+            conn.commit()
+            itemid = row[0]
+            lst_itemid.append(itemid)
+
+            # insert data to itemtopping table
+            for j in i['toppingid']:
+                sql_add_itemtopping = """
+                INSERT INTO
+                    itemtopping(itemid,toppingid)
+                VALUES(%s,%s)
+                """
+                sql_where = (itemid,j)
+                cursor.execute(sql_add_itemtopping,sql_where)
+                conn.commit()
+
+        # insert data to itemorder
+        for i in lst_itemid:
+            sql_add_itemorder = """
+            INSERT INTO itemorder(orderid,itemid)
             VALUES(%s,%s)
             """
-            sql_where = (itemid,j)
-            cursor.execute(sql_add_itemtopping,sql_where)
+            sql_where = (orderid,i)
+            cursor.execute(sql_add_itemorder,sql_where)
             conn.commit()
+        
+        cursor.close()
 
-    # insert data to itemorder
-    for i in lst_itemid:
-        sql_add_itemorder = """
-        INSERT INTO itemorder(orderid,itemid)
-        VALUES(%s,%s)
-        """
-        sql_where = (orderid,i)
-        cursor.execute(sql_add_itemorder,sql_where)
-        conn.commit()
-    
-    cursor.close()
-
-    return jsonify({"message":"Completed order! Your order are preparing!!!"})
-    
+        resp = jsonify({"message":"Completed order! Your order are preparing!!!"})
+        resp.status_code = 200
+        return resp
+    except:
+        resp = jsonify({"message":"Internal Server Error"})
+        resp.status_code = 500
+        return resp
 
 # add and update size
 @app.route('/admin/size', methods=['POST','PUT'])
@@ -422,7 +485,9 @@ def addAndUpdateSize():
             cursor.execute(sql_add_size,sql_where)
             conn.commit()
             cursor.close()
-            return jsonify({"message":"Added size!"})
+            resp = jsonify({"message":"Added size!"})
+            resp.status_code = 200
+            return resp
         
         elif request.method == 'PUT':
             _json = request.json()
@@ -441,9 +506,13 @@ def addAndUpdateSize():
             cursor.execute(sql_update_size,sql_where)
             conn.commit()
             cursor.close()
-            return jsonify({"message":"Updated size!"})
+            resp = jsonify({"message":"Updated size!"})
+            resp.status_code = 200
+            return resp
     else:
-        return jsonify({"message":"You are not authorized!"})
+        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
+        resp.status_code = 401
+        return resp
 
 
 
@@ -467,10 +536,14 @@ def orderStatusUpdate():
         cursor.execute(sql,sql_where)
         conn.commit()
         cursor.close()
-        return jsonify({"message":"Updated order status to 'Delivering'!"})
+        resp = jsonify({"message":"Updated order status to 'Delivering'!"})
+        resp.status_code = 200
+        return resp
     
     else:
-        return jsonify({"message":"You are not authorized!"})
+        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
+        resp.status_code = 401
+        return resp
 
 
 
@@ -490,7 +563,9 @@ def userConfirmCompletedOrder():
     cursor.execute(sql,sql_where)
     conn.commit()
     cursor.close()
-    return jsonify({"message":"Updated order status to 'Completed'!"})
+    resp = jsonify({"message":"Updated order status to 'Completed'!"})
+    resp.status_code = 200
+    return resp
 
 
 @app.route('/changePassword',methods=['PUT'])
@@ -510,7 +585,6 @@ def changePassword():
     sql_where = (userid,)
     cursor.execute(sql_get_password,sql_where)
     row = cursor.fetchone()
-    print(row)
     password_hash = row[0]
     if bcrypt.checkpw(_oldPassword.encode('utf-8'),password_hash.encode('utf-8')):
         # hash password
@@ -526,9 +600,13 @@ def changePassword():
         cursor.execute(sql_change_password,sql_where)
         conn.commit()
         cursor.close()
-        return jsonify({"message":"Your password changed !!!"})
+        resp = jsonify({"message":"Your password changed !!!"})
+        resp.status = 200
+        return resp
     else:
-        return jsonify({"message":"Your old password is wrong"})
+        resp = jsonify({"message":"Bad Request - Your old password is wrong"})
+        resp.status_code = 400
+        return resp
 
 
 @app.route('/resetPassword',methods = ['POST'])
@@ -545,14 +623,19 @@ def resetRequest():
     sql_where = (_email,)
     cursor.execute(sql_check_email,sql_where)
     row = cursor.fetchone()
-    userid = row[0]
+    userid = row['userid']
     cursor.close()
     
     if userid:
         sendEmail(userid,_email)
-        return jsonify({"message":"Hệ thống đã gửi cho bạn mail thông báo thay đổi mật khẩu. Hãy vào mail để kiểm tra!"})
+        resp = jsonify({"message":"Hệ thống đã gửi cho bạn mail thông báo thay đổi mật khẩu. Hãy vào mail để kiểm tra!"})
+        resp.status_code = 200
+        return resp
     else:
-        return jsonify({"message":"email ko ton tai"})
+        resp = jsonify({"message":"Not Found - Email doesn't exists in system!"})
+        resp.status_code = 400
+        return resp
+
 
 
 def sendEmail(userid,_email):
@@ -589,9 +672,13 @@ def verifyTokenEmail():
         conn.commit()
         cursor.close()
 
-        return jsonify({"message":"Your password changed to '123'!!!"})
+        resp = jsonify({"message":"Your password changed to '123'!!!"})
+        resp.status_code = 200
+        return resp
     else:
-        return jsonify({"message":"Account doesn't exist"})
+        resp = jsonify({"message":"Not Found - Account doesn't exists"})
+        resp.status_code = 404
+        return resp
 
 
 
