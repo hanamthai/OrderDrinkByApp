@@ -37,20 +37,20 @@ app.config['MAIL_USERNAME'] = 'noname09092001@gmail.com'
 app.config['MAIL_PASSWORD'] = 'ulbtjapttoblznip'
 mail = Mail(app)
 
-CORS(app)
+CORS(app)   # Cross-origin resource sharing
 
 # Local
-# DB_HOST = "localhost"
-# DB_NAME = "Drink Order"
-# DB_USER = "postgres"
-# DB_PASS = "123"
+DB_HOST = "localhost"
+DB_NAME = "Drink Order"
+DB_USER = "postgres"
+DB_PASS = "123"
 
 
 # Public
-DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-DB_NAME = "hanamthai_drinkorder"
-DB_USER = "hanamthai_admin"
-DB_PASS = "021101054"
+# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+# DB_NAME = "hanamthai_drinkorder"
+# DB_USER = "hanamthai_admin"
+# DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -136,15 +136,14 @@ def register():
     _phonenumber = _json['phonenumber']
     _password = _json['password']
     _fullname = _json['fullname']
-    _rolename = _json['rolename']
     _address = _json['address']
     _email = _json['email']
 
     # INSERT user
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # check phonenumber already exists
-    sql = "SELECT * FROM users WHERE phonenumber = %s"
-    sql_where = (_phonenumber,)
+    # check phonenumber and email already exists
+    sql = "SELECT * FROM users WHERE phonenumber = %s or email = %s"
+    sql_where = (_phonenumber,_email)
     cursor.execute(sql, sql_where)
     row = cursor.fetchone()
     if row == None:
@@ -154,14 +153,14 @@ def register():
         # insert recored
         sql = "INSERT INTO users(phonenumber,password,fullname,rolename,address,email,status) VALUES(%s,%s,%s,%s,%s,%s,%s)"
         sql_where = (_phonenumber, _password, _fullname,
-                     _rolename, _address,_email,'action')
+                     'user', _address,_email,'action')
         cursor.execute(sql, sql_where)
         conn.commit()
         cursor.close()
         return jsonify({'message': 'You completed register!'})
     else:
         cursor.close()
-        return jsonify({'message': 'Your phone already exists!'})
+        return jsonify({'message': 'Your phone or email already exists!'})
 
 
 @app.route('/logout', methods=['POST'])
@@ -250,38 +249,40 @@ def category_info():
 @jwt_required()
 def user_info():
     userid = get_jwt_identity()
-
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     if request.method == 'GET':
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         sql = """
-        SELECT * FROM users WHERE userid = %s
+        SELECT 
+            userid,phonenumber,fullname,rolename,address,email 
+        FROM users WHERE userid = %s
         """
         sql_where = (userid,)
         cursor.execute(sql,sql_where)
         row = cursor.fetchone()
-        user = {'userid':row[0],'phonenumber':row[1],'password':row[2],'fullname':row[3],'rolename':row[4],'address':row[5],'email':row[6]}
+        user = {'userid':row['userid'],'phonenumber':row['phonenumber'],
+                'fullname':row['fullname'],'rolename':row['rolename'],
+                'address':row['address'],'email':row['email']}
+        cursor.close()
         return jsonify(user=user)
     
     elif request.method == 'PUT':
         _json = request.json
-        _phonenumber = _json['phonenumber']
         _fullname = _json['fullname']
         _address = _json['address']
 
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         sql = """
         UPDATE users 
-        SET phonenumber = %s,
-            fullname = %s,
+        SET fullname = %s,
             address = %s
         WHERE userid = %s
         """
-        sql_where = (_phonenumber,_fullname,_address,userid)
+        sql_where = (_fullname,_address,userid)
         cursor.execute(sql,sql_where)
         conn.commit()
         cursor.close()
         return jsonify({"message":"User information updated!"})
     
+    cursor.close()
     resp = jsonify({"message":"Error user information!"})
     resp.status_code = 501
     return resp
