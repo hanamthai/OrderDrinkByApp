@@ -184,16 +184,16 @@ def logout():
 
 # Protect a route with jwt_required, which will kick out requests
 # without a valid JWT present.
-@app.route("/protected", methods=["GET"])
-@jwt_required()
-def protected():
-    # Access the identity of the current user with get_jwt_identity
-    claims = get_jwt()
-    _userid = claims['sub']
-    _rolename = claims['rolename']
-    resp = jsonify({"userid":_userid,"rolename":_rolename})
-    resp.status_code = 200
-    return resp
+# @app.route("/protected", methods=["GET"])
+# @jwt_required()
+# def protected():
+#     # Access the identity of the current user with get_jwt_identity
+#     claims = get_jwt()
+#     _userid = claims['sub']
+#     _rolename = claims['rolename']
+#     resp = jsonify({"userid":_userid,"rolename":_rolename})
+#     resp.status_code = 200
+#     return resp
 
 
 # drink detail
@@ -392,7 +392,7 @@ def addAndChangeTopping():
 
 
 # create order
-@app.route('/order',methods = ['POST'])
+@app.route('/order/preparing',methods = ['POST'])
 @jwt_required()
 def createOrder():
     userid = get_jwt_identity()
@@ -463,6 +463,58 @@ def createOrder():
         resp = jsonify({"message":"Internal Server Error"})
         resp.status_code = 500
         return resp
+    
+
+# Cancelled order
+@app.route('/order/cancel', methods = ['PUT'])
+@jwt_required()
+def cancelledOrder():
+    userid = get_jwt_identity()
+
+    _json = request.json
+    _orderid = _json['orderid']
+
+    # check orderid already exists and it have a 'Initialize' or 'Preparing' status 
+    # then system allows for cancel order 
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    
+    sql_check_constraint = """
+    SELECT orderid FROM orders
+    WHERE
+        orderid = %s
+        AND
+            userid = %s
+        AND
+            (status = %s OR status = %s)
+    """
+
+    sql_where = (_orderid,userid,'Initialize','Preparing')
+    cursor.execute(sql_check_constraint,sql_where)
+    row = cursor.fetchone()
+
+    if row:
+        # update order status to 'Cancelled'
+        sql_cancel = """
+        UPDATE orders
+        SET status = %s
+        WHERE orderid = %s
+        """
+        sql_where = ('Cancelled',_orderid)
+        cursor.execute(sql_cancel,sql_where)
+        conn.commit()
+        cursor.close()
+        resp = jsonify({"message":"Your order status updated to 'Cancelled'!"})
+        resp.status_code = 200
+        return resp
+
+    else:
+        cursor.close()
+        resp = jsonify({"message":"Your order cannot cancel"})
+        resp.status_code = 400
+        return resp
+
+
+
 
 # add and update size
 @app.route('/admin/size', methods=['POST','PUT'])
@@ -472,7 +524,7 @@ def addAndUpdateSize():
     rolename = info['rolename']
     if rolename == 'admin':
         if request.method == 'POST':
-            _json = request.json()
+            _json = request.json
             _namesize = _json['namesize']
             _price = _json['price']
 
