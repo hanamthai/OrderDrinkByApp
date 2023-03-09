@@ -40,17 +40,17 @@ mail = Mail(app)
 CORS(app)   # Cross-origin resource sharing
 
 # Local
-DB_HOST = "localhost"
-DB_NAME = "Drink Order"
-DB_USER = "postgres"
-DB_PASS = "123"
+# DB_HOST = "localhost"
+# DB_NAME = "Drink Order"
+# DB_USER = "postgres"
+# DB_PASS = "123"
 
 
 # Public
-# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-# DB_NAME = "hanamthai_drinkorder"
-# DB_USER = "hanamthai_admin"
-# DB_PASS = "021101054"
+DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+DB_NAME = "hanamthai_drinkorder"
+DB_USER = "hanamthai_admin"
+DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -623,17 +623,17 @@ def resetRequest():
     sql_where = (_email,)
     cursor.execute(sql_check_email,sql_where)
     row = cursor.fetchone()
-    userid = row['userid']
     cursor.close()
     
-    if userid:
+    if row:
+        userid = row['userid']
         sendEmail(userid,_email)
         resp = jsonify({"message":"Hệ thống đã gửi cho bạn mail thông báo thay đổi mật khẩu. Hãy vào mail để kiểm tra!"})
         resp.status_code = 200
         return resp
     else:
         resp = jsonify({"message":"Not Found - Email doesn't exists in system!"})
-        resp.status_code = 400
+        resp.status_code = 404
         return resp
 
 
