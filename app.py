@@ -40,17 +40,17 @@ mail = Mail(app)
 CORS(app)   # Cross-origin resource sharing
 
 # Local
-DB_HOST = "localhost"
-DB_NAME = "Drink Order"
-DB_USER = "postgres"
-DB_PASS = "123"
+# DB_HOST = "localhost"
+# DB_NAME = "Drink Order"
+# DB_USER = "postgres"
+# DB_PASS = "123"
 
 
 # Public
-# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-# DB_NAME = "hanamthai_drinkorder"
-# DB_USER = "hanamthai_admin"
-# DB_PASS = "021101054"
+DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+DB_NAME = "hanamthai_drinkorder"
+DB_USER = "hanamthai_admin"
+DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
