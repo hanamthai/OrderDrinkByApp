@@ -792,5 +792,52 @@ def getCustomerInfo():
         return resp
 
 
+## Lock and unlock customer accounts
+@app.route('/admin/customer/status', methods = ['PUT'])
+@jwt_required()
+def changeCustomerStatus():
+    data = get_jwt()
+    rolename = data['rolename']
+
+    _json = request.json
+    userid = _json['userid']
+
+    if rolename == 'admin':
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        # if the user status is active then i will change it to inactive and ngược lại
+        sql_check_status = """
+        SELECT status FROM users
+        WHERE userid = %s
+        """
+        sql_where = (userid,)
+        cursor.execute(sql_check_status,sql_where)
+        userStatus = cursor.fetchone()[0]
+
+        _status = ''
+        if userStatus == 'active':
+            _status = 'inactive'
+        elif userStatus == 'inactive':
+            _status = 'active'
+
+        # change user status
+        sql_inactive_status = """
+        UPDATE users
+        SET status = %s
+        WHERE userid = %s
+        """
+        sql_where = (_status,userid)
+        cursor.execute(sql_inactive_status,sql_where)
+        conn.commit()
+        cursor.close()
+        resp = jsonify({'message':'Changed customer account status!!'})
+        resp.status_code = 200
+        return resp
+
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+
+
 if __name__ == "__main__":
     app.run()
