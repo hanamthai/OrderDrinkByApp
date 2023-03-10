@@ -593,26 +593,43 @@ def orderStatusUpdate():
         return resp
 
 
-# user confirm the order is completed
-@app.route('/order/update',methods=['PUT'])
+# user confirm the order is 'Completed'
+@app.route('/order/complete',methods=['PUT'])
 @jwt_required()
 def userConfirmCompletedOrder():
+    userid = get_jwt_identity()
     _json = request.json
     orderid = _json['orderid']
 
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    sql = """
-    UPDATE orders
-    SET status = 'Completed'
-    WHERE orderid = %s
+    # check order status is 'Delivering'or not.
+    sql_check_delevering = """
+    SELECT orderid FROM orders
+    WHERE orderid = %s AND userid = %s AND status = 'Delivering' 
     """
-    sql_where = (orderid,)
-    cursor.execute(sql,sql_where)
-    conn.commit()
-    cursor.close()
-    resp = jsonify({"message":"Updated order status to 'Completed'!"})
-    resp.status_code = 200
-    return resp
+    sql_where = (orderid,userid)
+    cursor.execute(sql_check_delevering,sql_where)
+    row = cursor.fetchone()
+
+    if row:
+        sql_completed = """
+        UPDATE orders
+        SET status = 'Completed'
+        WHERE orderid = %s
+        """
+        sql_where = (orderid,)
+        # update order status to 'Completed'
+        cursor.execute(sql_completed,sql_where)
+        conn.commit()
+        cursor.close()
+        resp = jsonify({"message":"Updated order status to 'Completed'!"})
+        resp.status_code = 200
+        return resp
+    else:
+        cursor.close()
+        resp = jsonify({"message":"You're cannot change the order status to 'Completed'!"})
+        resp.status_code = 400
+        return resp
 
 
 
