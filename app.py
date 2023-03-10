@@ -100,7 +100,6 @@ def login():
 
         cursor.execute(sql, sql_where)
         row = cursor.fetchone()
-        print(row)
         cursor.close()
         if row:
             password_hash = row['password']
@@ -156,7 +155,7 @@ def register():
         # insert recored
         sql = "INSERT INTO users(phonenumber,password,fullname,rolename,address,email,status) VALUES(%s,%s,%s,%s,%s,%s,%s)"
         sql_where = (_phonenumber, _password, _fullname,
-                     'user', _address,_email,'action')
+                     'user', _address,_email,'active')
         cursor.execute(sql, sql_where)
         conn.commit()
         cursor.close()
@@ -485,7 +484,6 @@ def cancelledOrder():
     sql_where = (_orderid,userid,'Initialize','Preparing')
     cursor.execute(sql_check_constraint,sql_where)
     row = cursor.fetchone()
-    print(row)
 
     if row:
         # update order status to 'Cancelled'
@@ -764,7 +762,34 @@ def verifyTokenEmail():
         return resp
 
 
+# customer management
+## get customer info
+@app.route('/admin/customer/info',methods=['GET'])
+@jwt_required()
+def getCustomerInfo():
+    data = get_jwt()
+    rolename = data['rolename']
 
+    if rolename == 'admin':
+        sql = """
+        SELECT userid,phonenumber,fullname,address,email,status FROM users
+        WHERE rolename = 'user'
+        ORDER BY userid
+        """
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cursor.execute(sql)
+        info = cursor.fetchall()
+        customerInfo = [{'userid':i['userid'],'phonenumber':i['phonenumber'],
+                         'fullname':i['fullname'],'address':i['address'],'email':i['email'],
+                         'status':i['status']} for i in info]
+        cursor.close()
+        resp = jsonify(customerInfo=customerInfo)
+        resp.status_code = 200
+        return resp
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
 
 
 if __name__ == "__main__":
