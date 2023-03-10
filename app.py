@@ -40,36 +40,33 @@ mail = Mail(app)
 CORS(app)   # Cross-origin resource sharing
 
 # Local
-# DB_HOST = "localhost"
-# DB_NAME = "Drink Order"
-# DB_USER = "postgres"
-# DB_PASS = "123"
+DB_HOST = "localhost"
+DB_NAME = "Drink Order"
+DB_USER = "postgres"
+DB_PASS = "123"
 
 
 # Public
-DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-DB_NAME = "hanamthai_drinkorder"
-DB_USER = "hanamthai_admin"
-DB_PASS = "021101054"
+# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+# DB_NAME = "hanamthai_drinkorder"
+# DB_USER = "hanamthai_admin"
+# DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
 
 
-@app.route('/drink')
+@app.route('/alldrink')
 def home():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    # sql = "SELECT drinks.drinkid,drinkname,drinkimage,category,MIN(price),status FROM drinks INNER JOIN drinksize ON drinks.drinkid = drinksize.drinkid INNER JOIN sizes ON sizes.sizeid = drinksize.sizeid GROUP BY drinks.drinkid ORDER BY drinks.drinkid"
     sql = """
     SELECT
         drinks.drinkid, drinkname, drinkimage,
         categoryid, MIN(price), status
     FROM drinks
-    INNER JOIN drinksize
-        ON drinks.drinkid = drinksize.drinkid
     INNER JOIN sizes
-        ON sizes.sizeid = drinksize.sizeid
+        ON sizes.drinkid = drinks.drinkid
     WHERE status = 'Available'
     GROUP BY drinks.drinkid
     ORDER BY drinks.drinkid
@@ -224,12 +221,8 @@ def drinkdetail(id):
         select 
             s.sizeid,namesize,price from drinks as d
         inner join 
-            drinksize as ds 
-        on 
-            ds.drinkid = d.drinkid
-        inner join 
             sizes as s 
-        on s.sizeid = ds.sizeid
+        on s.drinkid = d.drinkid
         where d.drinkid = %s
         """
 
@@ -238,6 +231,7 @@ def drinkdetail(id):
     cursor.execute(sql_drink, sql_where)
     drink = cursor.fetchone()
     if drink == None:
+        cursor.close()
         resp = jsonify({'message':'Not Found - Item not found!'})
         resp.status_code = 404
         return resp
@@ -491,6 +485,7 @@ def cancelledOrder():
     sql_where = (_orderid,userid,'Initialize','Preparing')
     cursor.execute(sql_check_constraint,sql_where)
     row = cursor.fetchone()
+    print(row)
 
     if row:
         # update order status to 'Cancelled'
@@ -567,7 +562,7 @@ def addAndUpdateSize():
         return resp
 
 
-
+# admin updates order status to 'Delivering'
 @app.route('/admin/order/update',methods=['PUT'])
 @jwt_required()
 def orderStatusUpdate():
@@ -598,7 +593,7 @@ def orderStatusUpdate():
         return resp
 
 
-
+# user confirm the order is completed
 @app.route('/order/update',methods=['PUT'])
 @jwt_required()
 def userConfirmCompletedOrder():
@@ -618,6 +613,25 @@ def userConfirmCompletedOrder():
     resp = jsonify({"message":"Updated order status to 'Completed'!"})
     resp.status_code = 200
     return resp
+
+
+
+# user view order history
+# @app.route('/order/history', methods = ['GET'])
+# @jwt_required()
+# def userOrderHistory():
+#     userid = get_jwt_identity()
+
+#     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    
+#     sql_history = """
+    
+#     """
+    
+#     return jsonify({"message":"OK"})
+
+
+
 
 
 @app.route('/changePassword',methods=['PUT'])

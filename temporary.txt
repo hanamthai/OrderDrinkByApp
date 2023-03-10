@@ -1,3 +1,13 @@
+Đầu API còn thiếu:
+Admin:
+    Quản lý khách hàng
+    Quản lý đơn hàng
+    Thêm đồ uống
+User:
+    Xem lịch sử đơn hàng ('Completed' and 'Cancelled' status)
+    Quản lý đơn hàng hiện tại (Có thể HỦY đơn hàng khi đơn hàng chưa giao)
+
+
 import bcrypt
 import time
 password = "super secret password"
@@ -86,6 +96,36 @@ else:
 }
 
 
+
+
+{
+    "order":
+    {
+        "orderid": 2
+        "totalprice": 100000,
+        "address": "97, Man Thiện, phường Hiệp Phú, thành phố Thủ Đức",
+        "phonenumber": "0383292556",
+        "note": "Ít đá, nhiều sữa."
+        "status": "Completed"
+    },
+    "item":
+    [
+        {
+            "drinkid": 1,
+            "price": 55000,
+            "itemquantity": 2,
+            "sizeid": 1,
+            "toppingid": [1,2,3]
+        },
+        {
+            "drinkid": 2,
+            "price": 20000,
+            "itemquantity": 1,
+            "sizeid": 1,
+            "toppingid": []
+        }
+    ]
+}
 
 
 
@@ -271,3 +311,5 @@ def category_filter(id):
     cursor.close()
     return jsonify(drinks=drinks)
     
+
+
