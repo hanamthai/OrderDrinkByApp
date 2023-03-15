@@ -393,6 +393,7 @@ def createOrder():
     _json = request.json
     _order = _json['order']
     _item = _json['item']
+    # Trường hợp đang lưu vào database mà gặp lỗi thì ta vẫn có thể handle được.
     try:
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         # create order and get orderid
@@ -406,7 +407,7 @@ def createOrder():
         cursor.execute(sql_create_order,sql_where)
         row = cursor.fetchone()
         orderid = row[0]
-        conn.commit()
+        # conn.commit()
 
         # add record to items table and get itemid
         # loop run, cause we have many item in a request
@@ -422,7 +423,7 @@ def createOrder():
             sql_where = (i['drinkid'],i['price'],i['itemquantity'],i['sizeid'])
             cursor.execute(sql_add_item,sql_where)
             row = cursor.fetchone()
-            conn.commit()
+            # conn.commit()
             itemid = row[0]
             lst_itemid.append(itemid)
 
@@ -435,7 +436,7 @@ def createOrder():
                 """
                 sql_where = (itemid,j)
                 cursor.execute(sql_add_itemtopping,sql_where)
-                conn.commit()
+                # conn.commit()
 
         # insert data to itemorder
         for i in lst_itemid:
@@ -445,8 +446,8 @@ def createOrder():
             """
             sql_where = (orderid,i)
             cursor.execute(sql_add_itemorder,sql_where)
-            conn.commit()
-        
+            # conn.commit()
+        conn.commit()   # thay vì mỗi lần thêm dữ liệu vào một bảng là ta đi commit, thì giờ ta lưu hết vào trong DB rồi mới commit sau.
         cursor.close()
 
         resp = jsonify({"message":"Completed order! Your order are preparing!!!"})
