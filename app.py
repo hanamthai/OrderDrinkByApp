@@ -840,5 +840,34 @@ def changeCustomerStatus():
         return resp
 
 
+# Get order infomation by 'Preparing' status.
+@app.route('/admin/orderstatus/Preparing',methods=['GET'])
+@jwt_required()
+def getOrderInfoByPreparingStatus():
+    data = get_jwt()
+    rolename = data['rolename']
+
+    if rolename == 'admin':
+        sql = """
+        SELECT * FROM orders
+        WHERE status = 'Preparing'
+        """
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cursor.execute(sql)
+        row = cursor.fetchall()
+        cursor.close()
+        orderInfo = [{"orderid":i["orderid"],"userid":i["userid"],"totalprice":i["totalprice"],
+                        "address":i["address"],"phonenumber":i["phonenumber"],"note":i["note"],
+                        "orderdate":i["orderdate"]} for i in row]
+        resp = jsonify(orderInfo=orderInfo)
+        resp.status_code = 200
+        return resp
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+
+
+
 if __name__ == "__main__":
     app.run()
