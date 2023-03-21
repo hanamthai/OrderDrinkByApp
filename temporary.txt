@@ -33,35 +33,23 @@ else:
     print("It Does not Match :(")
 
 
-
-
 {
-    "drink":
-        {
-            "category": "Trà Sữa",
-            "description": "30 gram trà + 20 gram sữa.",
-            "drinkid": 3,
-            "drinkimage": "https://channel.mediacdn.vn/thumb_w/640/428462621602512896/2022/10/27/photo-1-1666869235187680523516.jpg",
-            "drinkname": "Trà Sữa Thập Cẩm",
-            "status": "Available"
-        },
-    "topping":
+    "data":
     [
         {
-            "nametopping": "THẠCH CỦ NĂNG",
-            "pricetopping": "$5,000.00",
-            "toppingid": 3
+            "status": "Completed",
+            "address": "123/89 Võ Văn Ngân, TP Thủ Đức",
+            "orderdate": "Mon, 20 Feb 2023 17:44:01 GMT",
+            "totalprice": "200000",
+            "orderdetail": "Trà sữa thập cẩm(x2), Size L, Cafe sữa(X1), Size S, Topping: Trân Châu Trắng, Thạch dừa"
         },
         {
-            "nametopping": "THẠCH CỦ NĂNG",
-            "pricetopping": "$5,000.00",
-            "toppingid": 3
+            "status": "Cancelled",
+            "address": "97 Man Thiện, phường Hiệp Phú, thành phố Thủ Đức, thành phố Hồ Chí Minh",
+            "orderdate": "Wed, 15 Mar 2023 10:02:40 GMT",
+            "totalprice": "200000",
+            "orderdetail": "Trà sữa thập cẩm(x2), Size L, Cafe sữa(X1), Size S, Topping: Trân Châu Trắng, Thạch dừa"
         },
-        {
-            "nametopping": "THẠCH CỦ NĂNG",
-            "pricetopping": "$5,000.00",
-            "toppingid": 3
-        }
     ]
 }
 
