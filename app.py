@@ -16,6 +16,7 @@ from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import get_jwt
 
+from format_timestamp import format_timestamp as ft
 
 
 app = Flask(__name__)
@@ -40,17 +41,17 @@ mail = Mail(app)
 CORS(app)   # Cross-origin resource sharing
 
 # Local
-# DB_HOST = "localhost"
-# DB_NAME = "Drink Order"
-# DB_USER = "postgres"
-# DB_PASS = "123"
+DB_HOST = "localhost"
+DB_NAME = "Drink Order"
+DB_USER = "postgres"
+DB_PASS = "123"
 
 
 # Public
-DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-DB_NAME = "hanamthai_drinkorder"
-DB_USER = "hanamthai_admin"
-DB_PASS = "021101054"
+# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
+# DB_NAME = "hanamthai_drinkorder"
+# DB_USER = "hanamthai_admin"
+# DB_PASS = "021101054"
 
 conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
@@ -632,18 +633,50 @@ def userConfirmCompletedOrder():
 
 
 # user view order history
-# @app.route('/order/history', methods = ['GET'])
-# @jwt_required()
-# def userOrderHistory():
-#     userid = get_jwt_identity()
+@app.route('/order/history', methods = ['GET'])
+@jwt_required()
+def userOrderHistory():
+    userid = get_jwt_identity()
 
-#     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
-#     sql_history = """
+    sql_history = """
+    SELECT 
+        orderid,status,address,orderdate,totalprice
+    FROM orders
+    WHERE 
+        userid = %s 
+            AND 
+        (status = 'Completed' OR status = 'Cancelled')
+    ORDER BY orderdate
+    """
+    sql_where = (userid,)
+    cursor.execute(sql_history,sql_where)
+    row = cursor.fetchall()
+    data = [{"status":i["status"],"address":i["address"],
+             "orderdate":ft(str(i["orderdate"])),"totalprice":i["totalprice"]} 
+             for i in row]
     
-#     """
-    
-#     return jsonify({"message":"OK"})
+    # add order detail in data
+    lst_orderid = [i["orderid"] for i in row]
+    str_order_detail = ""
+    # drinkname, itemquantity,namesize,nametopping
+    sql_order_detail = """
+    SELECT 
+        itemid
+    FROM itemorder
+    WHERE orderid IN (%s)
+    """
+    sql_where = (lst_orderid,)
+    cursor.execute(sql_order_detail,sql_where)
+    row = cursor.fetchall()
+    lst_item_id = [i["itemid"] for i in row]
+    print(lst_item_id)
+
+    cursor.close()
+    resp = jsonify(data=data)
+    resp.status_code = 200
+    return resp
 
 
 
@@ -876,4 +909,4 @@ def getOrderInfoByPreparingStatus(status):
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

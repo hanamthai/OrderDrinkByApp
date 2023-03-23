@@ -7,6 +7,15 @@ User:
     Xem lịch sử đơn hàng ('Completed' and 'Cancelled' status)
     Quản lý đơn hàng hiện tại (Có thể HỦY đơn hàng khi đơn hàng chưa giao)
 
+Psycopg2 là một thư viện Python cung cấp cho chúng ta khả năng truy cập vào cơ sở dữ liệu PostgreSQL từ Python. 
+Trong khi đó, Flask là một framework web cho phép chúng ta xây dựng các ứng dụng web theo mô hình MVC (Model-View-Controller).
+Trong Flask, các models thường được sử dụng để ánh xạ dữ liệu từ ứng dụng vào cơ sở dữ liệu. 
+Tuy nhiên, khi sử dụng psycopg2 để truy cập vào cơ sở dữ liệu PostgreSQL, chúng ta không cần phải tạo models để ánh xạ dữ liệu.
+Điều này là bởi vì psycopg2 cho phép chúng ta thực hiện các truy vấn SQL trực tiếp từ Python, 
+mà không cần thông qua một ORM (Object-Relational Mapping) như SQLAlchemy hay Django ORM. Chúng ta có thể sử dụng các câu lệnh SQL như 
+SELECT, INSERT, UPDATE, DELETE để thực hiện các thao tác trên cơ sở dữ liệu.
+Tuy nhiên, nếu bạn muốn sử dụng ORM để ánh xạ dữ liệu vào cơ sở dữ liệu trong Flask, bạn vẫn có thể sử dụng SQLAlchemy hoặc một ORM khác 
+thay vì sử dụng psycopg2. Việc sử dụng ORM sẽ giúp cho việc quản lý cơ sở dữ liệu dễ dàng hơn và giảm thiểu các lỗi xảy ra do viết mã SQL không chính xác.
 
 import bcrypt
 import time
