@@ -642,7 +642,7 @@ def userOrderHistory():
     
     sql_history = """
     SELECT 
-        status,address,orderdate,totalprice
+        orderid,status,address,orderdate,totalprice
     FROM orders
     WHERE 
         userid = %s 
@@ -653,8 +653,27 @@ def userOrderHistory():
     sql_where = (userid,)
     cursor.execute(sql_history,sql_where)
     row = cursor.fetchall()
-    data = [{"status":i["status"],"address":i["address"],"orderdate":ft(str(i["orderdate"])),"totalprice":i["totalprice"]} for i in row]
+    data = [{"status":i["status"],"address":i["address"],
+             "orderdate":ft(str(i["orderdate"])),"totalprice":i["totalprice"]} 
+             for i in row]
     
+    # add order detail in data
+    lst_orderid = [i["orderid"] for i in row]
+    str_order_detail = ""
+    # drinkname, itemquantity,namesize,nametopping
+    sql_order_detail = """
+    SELECT 
+        itemid
+    FROM itemorder
+    WHERE orderid IN (%s)
+    """
+    sql_where = (lst_orderid,)
+    cursor.execute(sql_order_detail,sql_where)
+    row = cursor.fetchall()
+    lst_item_id = [i["itemid"] for i in row]
+    print(lst_item_id)
+
+    cursor.close()
     resp = jsonify(data=data)
     resp.status_code = 200
     return resp
@@ -890,4 +909,4 @@ def getOrderInfoByPreparingStatus(status):
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
