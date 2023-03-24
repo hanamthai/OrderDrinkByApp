@@ -1,61 +1,18 @@
-# "orderdrink_api_flask_env\Scripts\activate" to activate enviroments of packet
-# "orderdrink_api_flask_env\Scripts\deactivate" to deactivate enviroments of packet
-# app.py
-from flask import Flask, jsonify, request, session, url_for
+from flask import jsonify, request, session, url_for
 import bcrypt
-from flask_cors import CORS  # pip install -U flask-cors
-from datetime import timedelta
-from flask_mail import Mail,Message
+from flask_mail import Message
 
-import psycopg2  # pip install psycopg2
-import psycopg2.extras
+from drinkorder import app
+from drinkorder import mail
+from drinkorder import conn
+from drinkorder import psycopg2
+from drinkorder import timedelta
 
 from flask_jwt_extended import get_jwt_identity
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import jwt_required
-from flask_jwt_extended import JWTManager
 from flask_jwt_extended import get_jwt
-
-from format_timestamp import format_timestamp as ft
-
-
-app = Flask(__name__)
-
-# Setup the Flask-JWT-Extended extension
-app.config['JWT_SECRET_KEY'] = 'drinkorderbyapp'
-app.config['JWT_TOKEN_LOCATION'] = 'headers'
-jwt = JWTManager(app)
-
-app.config['SECRET_KEY'] = 'drinkorderbyapp'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=60)
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
-# send email setup
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_TLS'] = False
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = 'noname09092001@gmail.com'
-app.config['MAIL_PASSWORD'] = 'ulbtjapttoblznip'
-mail = Mail(app)
-
-CORS(app)   # Cross-origin resource sharing
-
-# Local
-DB_HOST = "localhost"
-DB_NAME = "Drink Order"
-DB_USER = "postgres"
-DB_PASS = "123"
-
-
-# Public
-# DB_HOST = "postgresql-hanamthai.alwaysdata.net"
-# DB_NAME = "hanamthai_drinkorder"
-# DB_USER = "hanamthai_admin"
-# DB_PASS = "021101054"
-
-conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
-                        password=DB_PASS, host=DB_HOST)
-
+from drinkorder import format_timestamp as ft
 
 @app.route('/alldrink')
 def home():
@@ -654,24 +611,24 @@ def userOrderHistory():
     cursor.execute(sql_history,sql_where)
     row = cursor.fetchall()
     data = [{"status":i["status"],"address":i["address"],
-             "orderdate":ft(str(i["orderdate"])),"totalprice":i["totalprice"]} 
+             "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
              for i in row]
     
-    # add order detail in data
-    lst_orderid = [i["orderid"] for i in row]
-    str_order_detail = ""
-    # drinkname, itemquantity,namesize,nametopping
-    sql_order_detail = """
-    SELECT 
-        itemid
-    FROM itemorder
-    WHERE orderid IN (%s)
-    """
-    sql_where = (lst_orderid,)
-    cursor.execute(sql_order_detail,sql_where)
-    row = cursor.fetchall()
-    lst_item_id = [i["itemid"] for i in row]
-    print(lst_item_id)
+    # # add order detail in data
+    # lst_orderid = [i["orderid"] for i in row]
+    # str_order_detail = ""
+    # # drinkname, itemquantity,namesize,nametopping
+    # sql_order_detail = """
+    # SELECT 
+    #     itemid
+    # FROM itemorder
+    # WHERE orderid IN (%s)
+    # """
+    # sql_where = (lst_orderid,)
+    # cursor.execute(sql_order_detail,sql_where)
+    # row = cursor.fetchall()
+    # lst_item_id = [i["itemid"] for i in row]
+    # print(lst_item_id)
 
     cursor.close()
     resp = jsonify(data=data)
@@ -907,6 +864,3 @@ def getOrderInfoByPreparingStatus(status):
         return resp
 
 
-
-if __name__ == "__main__":
-    app.run(debug=True)

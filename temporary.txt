@@ -7,6 +7,8 @@ User:
     Xem lịch sử đơn hàng ('Completed' and 'Cancelled' status)
     Quản lý đơn hàng hiện tại (Có thể HỦY đơn hàng khi đơn hàng chưa giao)
 
+Circular import trong Python là trường hợp khi hai hoặc nhiều module hoặc package import lẫn nhau một cách trực tiếp hoặc gián tiếp, tạo ra một vòng lặp vô hạn trong quá trình import
+
 Psycopg2 là một thư viện Python cung cấp cho chúng ta khả năng truy cập vào cơ sở dữ liệu PostgreSQL từ Python. 
 Trong khi đó, Flask là một framework web cho phép chúng ta xây dựng các ứng dụng web theo mô hình MVC (Model-View-Controller).
 Trong Flask, các models thường được sử dụng để ánh xạ dữ liệu từ ứng dụng vào cơ sở dữ liệu. 
