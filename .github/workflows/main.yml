@@ -33,7 +33,10 @@ jobs:
 
       - name: Deploy Alwaysdata
         run: |
-          rsync --checksum * hanamthai_admin@ssh-hanamthai.alwaysdata.net:/home/hanamthai/service/orderdrink
+          rsync --checksum -r \
+            * \
+            drinkorder \
+            hanamthai_admin@ssh-hanamthai.alwaysdata.net:/home/hanamthai/service/orderdrink
 
       - name: Request Alwaysdata restart server
         env:
