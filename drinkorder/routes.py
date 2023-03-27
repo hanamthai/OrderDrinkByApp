@@ -614,21 +614,54 @@ def userOrderHistory():
              "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
              for i in row]
     
-    # # add order detail in data
-    # lst_orderid = [i["orderid"] for i in row]
-    # str_order_detail = ""
-    # # drinkname, itemquantity,namesize,nametopping
-    # sql_order_detail = """
-    # SELECT 
-    #     itemid
-    # FROM itemorder
-    # WHERE orderid IN (%s)
-    # """
-    # sql_where = (lst_orderid,)
-    # cursor.execute(sql_order_detail,sql_where)
-    # row = cursor.fetchall()
-    # lst_item_id = [i["itemid"] for i in row]
-    # print(lst_item_id)
+    # get order detail
+    lst_orderid = [i["orderid"] for i in row]
+    all_order_detail = []
+
+    for i in lst_orderid:
+        sql_order_detail = """
+        SELECT 
+            drinkname, itemquantity,namesize,nametopping
+        FROM 
+            itemorder as io
+        INNER JOIN 
+            items as i
+        ON
+            io.itemid = i.itemid
+        INNER JOIN 
+            drinks as d
+        ON
+            d.drinkid = i.drinkid
+        INNER JOIN
+            sizes as s
+        ON 
+            s.sizeid = i.sizeid
+        LEFT JOIN
+            itemtopping as it
+        ON
+            it.itemid = i.itemid
+        LEFT JOIN 
+            toppings as t
+        ON
+            t.toppingid = it.toppingid
+        WHERE orderid = %s
+        """
+        sql_where = (i,)
+        cursor.execute(sql_order_detail,sql_where)
+        orderdetail = cursor.fetchall()
+        all_order_detail.append(orderdetail)
+
+    # format all_order_detail
+    all_order_detail_format = []
+    for i in range(len(all_order_detail)):
+        result = ", ".join([f"{sublist[0]} (x{sublist[1]})" for sublist in all_order_detail[i]]) + ", size " + ", ".join(set([sublist[2] for sublist in all_order_detail[i]]))
+        topping = [sublist[3] for sublist in all_order_detail[i] if sublist[3] is not None]
+        if topping:
+            result += ", topping: " + ", ".join([sublist[3] for sublist in all_order_detail[i] if sublist[3] is not None])
+        all_order_detail_format.append(result)
+    # add order detail
+    for i in range(len(data)):
+        data[i].update({"orderdetail":all_order_detail_format[i]})
 
     cursor.close()
     resp = jsonify(data=data)

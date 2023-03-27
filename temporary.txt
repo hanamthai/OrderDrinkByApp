@@ -19,31 +19,6 @@ SELECT, INSERT, UPDATE, DELETE để thực hiện các thao tác trên cơ sở
 Tuy nhiên, nếu bạn muốn sử dụng ORM để ánh xạ dữ liệu vào cơ sở dữ liệu trong Flask, bạn vẫn có thể sử dụng SQLAlchemy hoặc một ORM khác 
 thay vì sử dụng psycopg2. Việc sử dụng ORM sẽ giúp cho việc quản lý cơ sở dữ liệu dễ dàng hơn và giảm thiểu các lỗi xảy ra do viết mã SQL không chính xác.
 
-import bcrypt
-import time
-password = "super secret password"
-# password = password.encode('utf-8')
-print(password)
-# Hash a password for the first time, with a randomly-generated salt
-hashed = bcrypt.hashpw(password, bcrypt.gensalt())
-print(hash)
-
-# Check that an unhashed password matches one that has previously been
-print(hashed)
-if bcrypt.checkpw(password, hashed):
-    print("It Matches!")
-else:
-    print("It Does not Match :(")
-hashed = bcrypt.hashpw(password, bcrypt.gensalt())
-time.sleep(2.4)
-
-
-if bcrypt.checkpw(password, hashed):
-    print("It Matches!")
-else:
-    print("It Does not Match :(")
-
-
 {
     "data":
     [
