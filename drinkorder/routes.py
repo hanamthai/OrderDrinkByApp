@@ -34,7 +34,7 @@ def home():
     cursor.close()
     drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
                 'categoryid': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
-    resp = jsonify(drinks=drinks)
+    resp = jsonify(data=drinks)
     resp.status_code = 200
     return resp
 
@@ -209,7 +209,7 @@ def drinkdetail(id):
     else:
         _size = []
     cursor.close()
-    resp = jsonify(drink=_drink,topping=_topping,size=_size)
+    resp = jsonify(data={'drink':_drink,'topping':_topping,'size':_size})
     resp.status_code = 200
     return resp
         
