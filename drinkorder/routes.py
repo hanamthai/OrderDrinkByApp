@@ -34,7 +34,7 @@ def home():
     cursor.close()
     drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
                 'categoryid': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
-    resp = jsonify(drinks=drinks)
+    resp = jsonify(data=drinks)
     resp.status_code = 200
     return resp
 
@@ -209,7 +209,7 @@ def drinkdetail(id):
     else:
         _size = []
     cursor.close()
-    resp = jsonify(drink=_drink,topping=_topping,size=_size)
+    resp = jsonify(data={'drink':_drink,'topping':_topping,'size':_size})
     resp.status_code = 200
     return resp
         
@@ -589,53 +589,139 @@ def userConfirmCompletedOrder():
 
 
 
-# user view order history
-@app.route('/order/history', methods = ['GET'])
+# user view order history or current
+@app.route('/order/<status>', methods = ['GET'])
 @jwt_required()
-def userOrderHistory():
+def userOrderHistory(status):
     userid = get_jwt_identity()
 
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    
-    sql_history = """
-    SELECT 
-        orderid,status,address,orderdate,totalprice
-    FROM orders
-    WHERE 
-        userid = %s 
-            AND 
-        (status = 'Completed' OR status = 'Cancelled')
-    ORDER BY orderdate
+    orderstatus = []
+    if status == 'history':
+        orderstatus=['Completed','Cancelled']
+    elif status == 'current':
+        orderstatus=['Preparing','Delivering']
+
+    if orderstatus == []:
+        resp = jsonify({"message":"Bad Request!!"})
+        resp.status_code = 400
+        return resp
+
+    try:
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        sql_history = """
+        SELECT 
+            orderid,status,address,orderdate,totalprice
+        FROM orders
+        WHERE 
+            userid = %s 
+                AND 
+            (status = %s OR status = %s)
+        ORDER BY orderdate DESC
+        """
+        sql_where = (userid,orderstatus[0],orderstatus[1])
+        cursor.execute(sql_history,sql_where)
+        row = cursor.fetchall()
+        data = [{"status":i["status"],"address":i["address"],
+                "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
+                for i in row]
+        
+        # get order detail
+        lst_orderid = [i["orderid"] for i in row]
+        all_order_detail = []
+
+        for i in lst_orderid:
+            sql_order_detail = """
+            SELECT 
+                drinkname, itemquantity,namesize,nametopping
+            FROM 
+                itemorder as io
+            INNER JOIN 
+                items as i
+            ON
+                io.itemid = i.itemid
+            INNER JOIN 
+                drinks as d
+            ON
+                d.drinkid = i.drinkid
+            INNER JOIN
+                sizes as s
+            ON 
+                s.sizeid = i.sizeid
+            LEFT JOIN
+                itemtopping as it
+            ON
+                it.itemid = i.itemid
+            LEFT JOIN 
+                toppings as t
+            ON
+                t.toppingid = it.toppingid
+            WHERE orderid = %s
+            """
+            sql_where = (i,)
+            cursor.execute(sql_order_detail,sql_where)
+            orderdetail = cursor.fetchall()
+            all_order_detail.append(orderdetail)
+
+        # format all_order_detail
+        all_order_detail_format = []
+        for i in range(len(all_order_detail)):
+            result = ", ".join([f"{sublist[0]} (x{sublist[1]})" for sublist in all_order_detail[i]]) + ", size " + ", ".join(set([sublist[2] for sublist in all_order_detail[i]]))
+            topping = [sublist[3] for sublist in all_order_detail[i] if sublist[3] is not None]
+            if topping:
+                result += ", topping: " + ", ".join([sublist[3] for sublist in all_order_detail[i] if sublist[3] is not None])
+            all_order_detail_format.append(result)
+        # add order detail
+        for i in range(len(data)):
+            data[i].update({"orderdetail":all_order_detail_format[i]})
+
+        cursor.close()
+        resp = jsonify(data=data)
+        resp.status_code = 200
+        return resp
+
+    except:
+        resp = jsonify({"message":"Internal Server Error!!"})
+        resp.status_code = 500
+        return resp
+
+
+# user "Cancelled" order
+@app.route('/order/current/cancel', methods=['PUT'])
+@jwt_required()
+def userCancelledOrder():
+    userid = get_jwt_identity()
+    _json = request.json
+    orderid = _json['orderid']
+
+    # Check orders must be in "Preparing" status to be "Cancelled"
+    cursor = conn.cursor(cursor_factory= psycopg2.extras.DictCursor)
+    sql_check_status = """
+    SELECT orderid FROM orders WHERE (orderid = %s AND status = %s)
     """
-    sql_where = (userid,)
-    cursor.execute(sql_history,sql_where)
-    row = cursor.fetchall()
-    data = [{"status":i["status"],"address":i["address"],
-             "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
-             for i in row]
-    
-    # # add order detail in data
-    # lst_orderid = [i["orderid"] for i in row]
-    # str_order_detail = ""
-    # # drinkname, itemquantity,namesize,nametopping
-    # sql_order_detail = """
-    # SELECT 
-    #     itemid
-    # FROM itemorder
-    # WHERE orderid IN (%s)
-    # """
-    # sql_where = (lst_orderid,)
-    # cursor.execute(sql_order_detail,sql_where)
-    # row = cursor.fetchall()
-    # lst_item_id = [i["itemid"] for i in row]
-    # print(lst_item_id)
+    sql_where = (orderid,'Preparing')
+    cursor.execute(sql_check_status,sql_where)
+    data = cursor.fetchone()
 
-    cursor.close()
-    resp = jsonify(data=data)
-    resp.status_code = 200
-    return resp
+    if data == None:
+        resp = jsonify({"message":"You can not Cancel Order!!"})
+        resp.status_code = 400
+        return resp
+    else:
+        # Change order status from "Delivering" to "Cancelled"
+        sql_change_status_order = """
+        UPDATE orders
+        SET status = %s
+        WHERE orderid = %s
+        """
+        sql_where = ('Cancelled',orderid)
+        cursor.execute(sql_change_status_order,sql_where)
+        conn.commit()
+        cursor.close()
 
-
+        resp = jsonify({"message":"Cancelled order!!"})
+        resp.status_code = 200
+        return resp
 
 
 
@@ -752,7 +838,7 @@ def verifyTokenEmail():
         return resp
 
 
-# customer management
+# admin management
 ## get customer info
 @app.route('/admin/customer/info',methods=['GET'])
 @jwt_required()
@@ -829,7 +915,7 @@ def changeCustomerStatus():
         return resp
 
 
-# Get order infomation by order status like preparing, delivering, completed, cancelled.
+## Get order infomation by order status like preparing, delivering, completed, cancelled.
 @app.route('/admin/orderstatus/<status>',methods=['GET'])
 @jwt_required()
 def getOrderInfoByPreparingStatus(status):
