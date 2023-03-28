@@ -1,11 +1,10 @@
 Đầu API còn thiếu:
 Admin:
-    Quản lý khách hàng
     Quản lý đơn hàng
     Thêm đồ uống
 User:
     Xem lịch sử đơn hàng ('Completed' and 'Cancelled' status)
-    Quản lý đơn hàng hiện tại (Có thể HỦY đơn hàng khi đơn hàng chưa giao)
+    Quản lý đơn hàng hiện tại (Có thể HỦY đơn hàng khi đơn hàng chưa giao, Chọn "Completed" khi đơn hàng đã giao)
 
 Circular import trong Python là trường hợp khi hai hoặc nhiều module hoặc package import lẫn nhau một cách trực tiếp hoặc gián tiếp, tạo ra một vòng lặp vô hạn trong quá trình import
 
@@ -18,6 +17,11 @@ mà không cần thông qua một ORM (Object-Relational Mapping) như SQLAlchem
 SELECT, INSERT, UPDATE, DELETE để thực hiện các thao tác trên cơ sở dữ liệu.
 Tuy nhiên, nếu bạn muốn sử dụng ORM để ánh xạ dữ liệu vào cơ sở dữ liệu trong Flask, bạn vẫn có thể sử dụng SQLAlchemy hoặc một ORM khác 
 thay vì sử dụng psycopg2. Việc sử dụng ORM sẽ giúp cho việc quản lý cơ sở dữ liệu dễ dàng hơn và giảm thiểu các lỗi xảy ra do viết mã SQL không chính xác.
+
+mục đích chính của việc tạo model là định nghĩa cấu trúc của đối tượng dữ liệu và cung cấp các phương thức để tương tác với cơ sở dữ liệu, giúp cho mã của bạn dễ bảo trì hơn và giảm thiểu lỗi trong quá trình phát triển.
+
+0 [['Sinh Tố Bơ', 5, 'Nhỏ', None], ['Trà Sữa Thập Cẩm', 1, 'Nhỏ', 'TRÂN CHÂU TRẮNG']]
+1 [['Trà Sữa Thập Cẩm', 1, 'Vừa', 'THẠCH CỦ NĂNG'], ['Sinh Tố Bơ', 1, 'Lớn', 'KEM TRỨNG NƯỚNG']]
 
 {
     "data":
