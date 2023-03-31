@@ -589,11 +589,13 @@ def userConfirmCompletedOrder():
 
 
 
-# user view order history or current
+# admin and user view order history or current 
 @app.route('/order/<status>', methods = ['GET'])
 @jwt_required()
 def userOrderHistory(status):
     userid = get_jwt_identity()
+    data = get_jwt()
+    rolename = data['rolename']
 
     orderstatus = []
     if status == 'history':
@@ -609,17 +611,44 @@ def userOrderHistory(status):
     try:
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
-        sql_history = """
-        SELECT 
-            orderid,status,address,orderdate,totalprice
-        FROM orders
-        WHERE 
-            userid = %s 
-                AND 
-            (status = %s OR status = %s)
-        ORDER BY orderdate DESC
-        """
-        sql_where = (userid,orderstatus[0],orderstatus[1])
+        # user get order 'history' or 'current'
+        if rolename == 'user':
+            sql_history = """
+            SELECT 
+                orderid,status,address,orderdate,totalprice
+            FROM orders
+            WHERE 
+                userid = %s 
+                    AND 
+                (status = %s OR status = %s)
+            ORDER BY orderdate DESC
+            """
+            sql_where = (userid,orderstatus[0],orderstatus[1])
+        
+        # admin get order 'current'
+        elif rolename == 'admin' and status == 'current':
+            sql_history = """
+            SELECT 
+                orderid,status,address,orderdate,totalprice
+            FROM orders
+            WHERE 
+                (status = %s)
+            ORDER BY orderdate DESC
+            """
+            sql_where = ('Preparing',)
+        
+        # admin get order 'history'
+        elif rolename == 'admin' and status == 'history':
+            sql_history = """
+            SELECT 
+                orderid,status,address,orderdate,totalprice
+            FROM orders
+            WHERE 
+                (status = %s OR status = %s)
+            ORDER BY orderdate DESC
+            """
+            sql_where = (orderstatus[0],orderstatus[1])
+
         cursor.execute(sql_history,sql_where)
         row = cursor.fetchall()
         data = [{"status":i["status"],"address":i["address"],
@@ -950,3 +979,74 @@ def getOrderInfoByPreparingStatus(status):
         return resp
 
 
+
+## revenue statistics by day or month or year
+@app.route('/admin/revenue', methods=['GET'])
+@jwt_required()
+def getRevenue():
+    data = get_jwt()
+    rolename = data['rolename']
+
+    if rolename == 'admin':
+        date = request.args.get('date')
+        flag = request.args.get('flag')
+
+        revenue = 0
+        revenue_detail = []
+        row = [] # contain raw data when i execute sql
+
+        # format date 'dd-mm-yy' to 'yy-mm-dd'
+        date_format = date[6:10] + '-' + date[3:5] + '-' + date[0:2]
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        sql_revenue = """
+        SELECT 
+            orderid, totalprice, orderdate
+        FROM
+            orders
+        WHERE 
+            CAST(orderdate as TEXT) 
+                LIKE 
+            CONCAT(%s,%s) 
+                AND 
+            status = 'Completed'
+        ORDER BY orderdate ASC;
+        """
+
+        if flag == 'today':
+            # get total revenue
+            sql_where = (date_format,'%')
+            cursor.execute(sql_revenue,sql_where)
+            row = cursor.fetchall()
+                
+        elif flag == 'month':
+            sql_where = (date_format[0:7],'%')
+            cursor.execute(sql_revenue,sql_where)
+            row = cursor.fetchall()
+
+        elif flag == 'year':
+            sql_where = (date_format[0:4],'%')
+            cursor.execute(sql_revenue,sql_where)
+            row = cursor.fetchall()
+        
+        else:
+            cursor.close()
+            resp = jsonify({"message":"Invalid parameter passed!!"})
+            resp.status_code = 400
+            return resp
+        
+        # total revenue and revenue detail
+        if row != None:
+            for i in row:
+                revenue += int(i['totalprice'])
+            revenue_detail = [{'orderid':i['orderid'],'orderdate':ft.format_timestamp(str(i['orderdate'])),
+                                'totalprice':i['totalprice']} for i in row]
+
+        cursor.close()
+        resp = jsonify(data = {'revenue':revenue,'revenueDetail':revenue_detail})
+        resp.status_code = 200
+        return resp
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
