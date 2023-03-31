@@ -1031,7 +1031,7 @@ def getRevenue():
         
         else:
             cursor.close()
-            resp = jsonify({"message":"Invalid parameter passed"})
+            resp = jsonify({"message":"Invalid parameter passed!!"})
             resp.status_code = 400
             return resp
         
