@@ -1,7 +1,7 @@
 Đầu API còn thiếu:
 Admin:
-    Quản lý đơn hàng
     Thêm đồ uống
+    Thống kê
 
 Circular import trong Python là trường hợp khi hai hoặc nhiều module hoặc package import lẫn nhau một cách trực tiếp hoặc gián tiếp, tạo ra một vòng lặp vô hạn trong quá trình import
 
