@@ -978,6 +978,41 @@ def getOrderInfoByPreparingStatus(status):
         resp.status_code = 401
         return resp
 
+## Admin: CURD drink (get all drink and drink detail already available APIs)
+## Update and detete
+@app.route('/admin/drink/<int:drinkid>', methods = ['PUT', 'DELETE'])
+@jwt_required()
+def admimGetAllDrink(drinkid):
+    data = get_jwt()
+    rolename = data['rolename']
+
+    if rolename == 'admin':
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        if request.method == 'PUT':
+            pass
+        elif request.method == 'DELETE':
+            sql_detete_drink = """
+            UPDATE drinks
+            SET status = 'Unvailable'
+            WHERE drinkid = %s
+            """
+            sql_where = (drinkid,)
+            cursor.execute(sql_detete_drink,sql_where)
+            conn.commit()
+            cursor.close()
+
+            resp = jsonify({'message':"Delete Successfully!!"})
+            resp.status_code = 200
+            return resp
+        else:
+            resp = jsonify({'message':"Not Implemented!!"})
+            resp.status_code = 501
+            return resp
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+
 
 
 ## revenue statistics by day or month or year
