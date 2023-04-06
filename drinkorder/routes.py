@@ -938,6 +938,81 @@ def changeCustomerStatus():
 
 
 ## Admin: CURD drink (get all drink and drink detail already available APIs)
+
+## Create drinks
+@app.route('/admin/drink/create', methods = ['POST'])
+@jwt_required()
+def createDrink():
+    data = get_jwt()
+    rolename = data['rolename']
+    
+    if rolename == 'admin':
+        _json = request.json
+        _drinkname = _json['drinkname']
+        _drinkimage = _json['drinkimage']
+        _description = _json['description']
+        _categoryid = _json['categoryid']
+        _sizeArr = _json['size']
+        _toppingArr = _json['topping']
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        # add info drink
+        sql_create_drink = """
+        INSERT INTO 
+            drinks(drinkname,drinkimage,description,categoryid,status)
+        VALUES
+            (%s,%s,%s,%s,%s)
+        RETURNING
+            drinkid
+        """
+        sql_where = (_drinkname,_drinkimage,_description,_categoryid,'Available')
+        
+        cursor.execute(sql_create_drink,sql_where)
+        row = cursor.fetchone()
+        drinkid = row[0]
+
+        # add info size
+        for i in _sizeArr:
+            sql_add_size = """
+            INSERT INTO sizes(namesize,price,drinkid) VALUES(%s,%s,%s)
+            """
+            sql_where = (i['namesize'],i['price'],drinkid)
+            cursor.execute(sql_add_size,sql_where)
+
+        # add info topping(if any)
+        if _toppingArr != None:
+            # add info topping to toppings table
+            lst_toppingid = []
+            for i in _toppingArr:
+                sql_add_topping = """
+                INSERT INTO toppings(nametopping,price) VALUES(%s,%s)
+                RETURNING toppingid
+                """
+                sql_where = (i['nametopping'],i['price'])
+                cursor.execute(sql_add_topping,sql_where)
+                toppingid = cursor.fetchone()
+                lst_toppingid.append(toppingid[0])
+            
+            # add toppingid to drinktopping table
+            for i in lst_toppingid:
+                sql_drinktopping = """
+                INSERT INTO drinktopping(drinkid,toppingid) VALUES(%s,%s)
+                """
+                sql_where = (drinkid,i)
+                cursor.execute(sql_drinktopping,sql_where)
+        
+        # commit it to DB
+        conn.commit()
+        cursor.close()
+        resp = jsonify({'message':"Add drink success!!"})
+        resp.status_code = 200
+        return resp
+    
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+
 ## Update and detete
 @app.route('/admin/drink/<int:drinkid>', methods = ['PUT', 'DELETE'])
 @jwt_required()
