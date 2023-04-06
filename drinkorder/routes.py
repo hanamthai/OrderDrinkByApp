@@ -34,9 +34,14 @@ def home():
     cursor.close()
     drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
                 'categoryid': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
-    resp = jsonify(data=drinks)
-    resp.status_code = 200
-    return resp
+    if drinks == None:
+        resp = jsonify({'message':"Items not found!!"})
+        resp.status_code = 400
+        return resp
+    else:
+        resp = jsonify(data=drinks)
+        resp.status_code = 200
+        return resp
 
 
 # Create a route to authenticate your users and return JWTs. The
@@ -257,7 +262,7 @@ def user_info():
                 'address':row['address'],'email':row['email']}
         cursor.close()
         if user:
-            resp = jsonify(user=user)
+            resp = jsonify(data=user)
             resp.status_code = 200
             return resp
         else:
@@ -589,7 +594,7 @@ def userConfirmCompletedOrder():
 
 
 
-# admin and user view order history or current 
+### admin and user view order history or current 
 @app.route('/order/<status>', methods = ['GET'])
 @jwt_required()
 def userOrderHistory(status):
@@ -625,20 +630,8 @@ def userOrderHistory(status):
             """
             sql_where = (userid,orderstatus[0],orderstatus[1])
         
-        # admin get order 'current'
-        elif rolename == 'admin' and status == 'current':
-            sql_history = """
-            SELECT 
-                orderid,status,address,orderdate,totalprice
-            FROM orders
-            WHERE 
-                (status = %s)
-            ORDER BY orderdate DESC
-            """
-            sql_where = ('Preparing',)
-        
-        # admin get order 'history'
-        elif rolename == 'admin' and status == 'history':
+        # admin get order 'history' or 'current'
+        elif rolename == 'admin':
             sql_history = """
             SELECT 
                 orderid,status,address,orderdate,totalprice
@@ -651,7 +644,7 @@ def userOrderHistory(status):
 
         cursor.execute(sql_history,sql_where)
         row = cursor.fetchall()
-        data = [{"status":i["status"],"address":i["address"],
+        data = [{"orderid":i["orderid"],"status":i["status"],"address":i["address"],
                 "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
                 for i in row]
         
@@ -888,7 +881,7 @@ def getCustomerInfo():
                          'fullname':i['fullname'],'address':i['address'],'email':i['email'],
                          'status':i['status']} for i in info]
         cursor.close()
-        resp = jsonify(customerInfo=customerInfo)
+        resp = jsonify(data=customerInfo)
         resp.status_code = 200
         return resp
     else:
@@ -943,40 +936,6 @@ def changeCustomerStatus():
         resp.status_code = 401
         return resp
 
-
-## Get order infomation by order status like preparing, delivering, completed, cancelled.
-@app.route('/admin/orderstatus/<status>',methods=['GET'])
-@jwt_required()
-def getOrderInfoByPreparingStatus(status):
-    data = get_jwt()
-    rolename = data['rolename']
-
-    if rolename == 'admin':
-        if status in ['Preparing','Delivering','Completed','Cancelled']:
-
-            sql = """
-            SELECT * FROM orders
-            WHERE status = %s
-            """
-            sql_where = (status,)
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            cursor.execute(sql,sql_where)
-            row = cursor.fetchall()
-            cursor.close()
-            orderInfo = [{"orderid":i["orderid"],"userid":i["userid"],"totalprice":i["totalprice"],
-                            "address":i["address"],"phonenumber":i["phonenumber"],"note":i["note"],
-                            "orderdate":i["orderdate"]} for i in row]
-            resp = jsonify(orderInfo=orderInfo)
-            resp.status_code = 200
-            return resp
-        else:
-            resp = jsonify({'message':"Parameter is not defined!"})
-            resp.status_code = 400
-            return resp
-    else:
-        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
-        resp.status_code = 401
-        return resp
 
 ## Admin: CURD drink (get all drink and drink detail already available APIs)
 ## Update and detete
