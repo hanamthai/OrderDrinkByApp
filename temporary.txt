@@ -1,7 +1,6 @@
 Đầu API còn thiếu:
 Admin:
     Thêm đồ uống
-    Thống kê
 
 Circular import trong Python là trường hợp khi hai hoặc nhiều module hoặc package import lẫn nhau một cách trực tiếp hoặc gián tiếp, tạo ra một vòng lặp vô hạn trong quá trình import
 
@@ -288,3 +287,87 @@ def category_filter(id):
     
 
 
+
+## Get order infomation by order status like preparing, delivering, completed, cancelled.
+@app.route('/admin/orderstatus/<status>',methods=['GET'])
+@jwt_required()
+def getOrderInfoByPreparingStatus(status):
+    data = get_jwt()
+    rolename = data['rolename']
+
+    if rolename == 'admin':
+        if status in ['Preparing','Delivering','Completed','Cancelled']:
+
+            sql = """
+            SELECT * FROM orders
+            WHERE status = %s
+            """
+            sql_where = (status,)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cursor.execute(sql,sql_where)
+            row = cursor.fetchall()
+            cursor.close()
+            orderInfo = [{"orderid":i["orderid"],"userid":i["userid"],"totalprice":i["totalprice"],
+                            "address":i["address"],"phonenumber":i["phonenumber"],"note":i["note"],
+                            "orderdate":i["orderdate"]} for i in row]
+            resp = jsonify(orderInfo=orderInfo)
+            resp.status_code = 200
+            return resp
+        else:
+            resp = jsonify({'message':"Parameter is not defined!"})
+            resp.status_code = 400
+            return resp
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+
+# add and change topping
+@app.route('/admin/topping',methods=['POST','PUT'])
+@jwt_required()
+def addAndChangeTopping():
+    info = get_jwt()
+    rolename = info['rolename']
+    if rolename == 'admin':
+        if request.method == 'POST':
+            _json = request.json
+            _nametopping = _json['nametopping']
+            _price = _json['price']
+
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            sql = """
+            INSERT INTO toppings(nametopping,price) VALUES(%s,%s)
+            """
+            sql_where = (_nametopping,_price)
+            cursor.execute(sql,sql_where)
+            conn.commit()
+            cursor.close()
+            resp = jsonify({"message":"Added topping!"})
+            resp.status_code = 200
+            return resp
+
+        elif request.method == 'PUT':
+            _json = request.json
+            _toppingid = _json['toppingid']
+            _nametopping = _json['nametopping']
+            _price = _json['price']
+            
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            sql = """
+            UPDATE toppings
+            SET nametopping = %s,
+                price = %s
+            WHERE toppingid = %s
+            """
+            sql_where = (_nametopping,_price,_toppingid)
+            cursor.execute(sql,sql_where)
+            conn.commit()
+            cursor.close()
+            resp = jsonify({"message":"Updated topping!"})
+            resp.status_code = 200
+            return resp 
+
+    else:
+        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
+        resp.status_code = 401
+        return resp

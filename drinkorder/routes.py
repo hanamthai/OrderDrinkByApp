@@ -34,9 +34,14 @@ def home():
     cursor.close()
     drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
                 'categoryid': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
-    resp = jsonify(data=drinks)
-    resp.status_code = 200
-    return resp
+    if drinks == None:
+        resp = jsonify({'message':"Items not found!!"})
+        resp.status_code = 400
+        return resp
+    else:
+        resp = jsonify(data=drinks)
+        resp.status_code = 200
+        return resp
 
 
 # Create a route to authenticate your users and return JWTs. The
@@ -257,7 +262,7 @@ def user_info():
                 'address':row['address'],'email':row['email']}
         cursor.close()
         if user:
-            resp = jsonify(user=user)
+            resp = jsonify(data=user)
             resp.status_code = 200
             return resp
         else:
@@ -289,56 +294,6 @@ def user_info():
     resp.status_code = 501
     return resp
     
-
-# add and change topping
-@app.route('/admin/topping',methods=['POST','PUT'])
-@jwt_required()
-def addAndChangeTopping():
-    info = get_jwt()
-    rolename = info['rolename']
-    if rolename == 'admin':
-        if request.method == 'POST':
-            _json = request.json
-            _nametopping = _json['nametopping']
-            _price = _json['price']
-
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            sql = """
-            INSERT INTO toppings(nametopping,price) VALUES(%s,%s)
-            """
-            sql_where = (_nametopping,_price)
-            cursor.execute(sql,sql_where)
-            conn.commit()
-            cursor.close()
-            resp = jsonify({"message":"Added topping!"})
-            resp.status_code = 200
-            return resp
-
-        elif request.method == 'PUT':
-            _json = request.json
-            _toppingid = _json['toppingid']
-            _nametopping = _json['nametopping']
-            _price = _json['price']
-            
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            sql = """
-            UPDATE toppings
-            SET nametopping = %s,
-                price = %s
-            WHERE toppingid = %s
-            """
-            sql_where = (_nametopping,_price,_toppingid)
-            cursor.execute(sql,sql_where)
-            conn.commit()
-            cursor.close()
-            resp = jsonify({"message":"Updated topping!"})
-            resp.status_code = 200
-            return resp 
-
-    else:
-        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
-        resp.status_code = 401
-        return resp
 
 
 # create order
@@ -589,7 +544,7 @@ def userConfirmCompletedOrder():
 
 
 
-# admin and user view order history or current 
+### admin and user view order history or current 
 @app.route('/order/<status>', methods = ['GET'])
 @jwt_required()
 def userOrderHistory(status):
@@ -625,20 +580,8 @@ def userOrderHistory(status):
             """
             sql_where = (userid,orderstatus[0],orderstatus[1])
         
-        # admin get order 'current'
-        elif rolename == 'admin' and status == 'current':
-            sql_history = """
-            SELECT 
-                orderid,status,address,orderdate,totalprice
-            FROM orders
-            WHERE 
-                (status = %s)
-            ORDER BY orderdate DESC
-            """
-            sql_where = ('Preparing',)
-        
-        # admin get order 'history'
-        elif rolename == 'admin' and status == 'history':
+        # admin get order 'history' or 'current'
+        elif rolename == 'admin':
             sql_history = """
             SELECT 
                 orderid,status,address,orderdate,totalprice
@@ -651,7 +594,7 @@ def userOrderHistory(status):
 
         cursor.execute(sql_history,sql_where)
         row = cursor.fetchall()
-        data = [{"status":i["status"],"address":i["address"],
+        data = [{"orderid":i["orderid"],"status":i["status"],"address":i["address"],
                 "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
                 for i in row]
         
@@ -888,7 +831,7 @@ def getCustomerInfo():
                          'fullname':i['fullname'],'address':i['address'],'email':i['email'],
                          'status':i['status']} for i in info]
         cursor.close()
-        resp = jsonify(customerInfo=customerInfo)
+        resp = jsonify(data=customerInfo)
         resp.status_code = 200
         return resp
     else:
@@ -944,34 +887,225 @@ def changeCustomerStatus():
         return resp
 
 
-## Get order infomation by order status like preparing, delivering, completed, cancelled.
-@app.route('/admin/orderstatus/<status>',methods=['GET'])
+## Admin: CURD drink (get all drink and drink detail already available APIs)
+
+## Create drinks
+@app.route('/admin/drink/create', methods = ['POST'])
 @jwt_required()
-def getOrderInfoByPreparingStatus(status):
+def createDrink():
+    data = get_jwt()
+    rolename = data['rolename']
+    
+    if rolename == 'admin':
+        _json = request.json
+        _drinkname = _json['drinkname']
+        _drinkimage = _json['drinkimage']
+        _description = _json['description']
+        _categoryid = _json['categoryid']
+        _sizeArr = _json['size']
+        _toppingArr = _json['topping']
+
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        # add info drink
+        sql_create_drink = """
+        INSERT INTO 
+            drinks(drinkname,drinkimage,description,categoryid,status)
+        VALUES
+            (%s,%s,%s,%s,%s)
+        RETURNING
+            drinkid
+        """
+        sql_where = (_drinkname,_drinkimage,_description,_categoryid,'Available')
+        
+        cursor.execute(sql_create_drink,sql_where)
+        row = cursor.fetchone()
+        drinkid = row[0]
+
+        # add info size
+        if _sizeArr != []:
+            for i in _sizeArr:
+                sql_add_size = """
+                INSERT INTO sizes(namesize,price,drinkid) VALUES(%s,%s,%s)
+                """
+                sql_where = (i['namesize'],i['price'],drinkid)
+                cursor.execute(sql_add_size,sql_where)
+        else:
+            resp = jsonify({'message':"Missing input - You have to add size of drink!!"})
+            resp.status_code = 400
+            return resp
+
+        # add info topping(if any)
+        if _toppingArr != []:
+            # add info topping to toppings table
+            lst_toppingid = []
+            for i in _toppingArr:
+                sql_add_topping = """
+                INSERT INTO toppings(nametopping,price) VALUES(%s,%s)
+                RETURNING toppingid
+                """
+                sql_where = (i['nametopping'],i['price'])
+                cursor.execute(sql_add_topping,sql_where)
+                toppingid = cursor.fetchone()
+                lst_toppingid.append(toppingid[0])
+            
+            # add toppingid to drinktopping table
+            for i in lst_toppingid:
+                sql_drinktopping = """
+                INSERT INTO drinktopping(drinkid,toppingid) VALUES(%s,%s)
+                """
+                sql_where = (drinkid,i)
+                cursor.execute(sql_drinktopping,sql_where)
+        
+        # commit it to DB
+        conn.commit()
+        cursor.close()
+        resp = jsonify({'message':"Add drink success!!"})
+        resp.status_code = 200
+        return resp
+    
+    else:
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+
+## Update and detete
+@app.route('/admin/drink/<int:drinkid>', methods = ['PUT', 'DELETE'])
+@jwt_required()
+def admimGetAllDrink(drinkid):
     data = get_jwt()
     rolename = data['rolename']
 
     if rolename == 'admin':
-        if status in ['Preparing','Delivering','Completed','Cancelled']:
-
-            sql = """
-            SELECT * FROM orders
-            WHERE status = %s
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        if request.method == 'PUT':
+            _json = request.json
+            _drinkid = _json['drinkid']
+            _drinkname = _json['drinkname']
+            _drinkimage = _json['drinkimage']
+            _description = _json['description']
+            _categoryid = _json['categoryid']
+            _sizeArr = _json['size']
+            _toppingArr = _json['topping']
+            
+            # change drink info
+            sql_change_drink = """
+            UPDATE
+                drinks
+            SET
+                drinkname = %s,drinkimage = %s, description = %s, categoryid = %s
+            WHERE drinkid = %s
             """
-            sql_where = (status,)
+            sql_where = (_drinkname,_drinkimage,_description,_categoryid,_drinkid)
             cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            cursor.execute(sql,sql_where)
-            row = cursor.fetchall()
+            cursor.execute(sql_change_drink,sql_where)
+            
+            # change size of drink
+            if _sizeArr != []:
+                # If the request body has sizeid means that it already exists in the system
+                # otherwise it doesn't exists and we have to create it in DB
+                for i in _sizeArr:
+                    # there are sizeid (we just change it)
+                    if 'sizeid' in i:
+                        _sizeid = i['sizeid']
+                        _namesize = i['namesize']
+                        _price = i['price']
+
+                        sql_change_size = """
+                        UPDATE
+                            sizes
+                        SET
+                            namesize = %s, price = %s
+                        WHERE
+                            sizeid = %s
+                        """
+                        sql_where = (_namesize,_price,_sizeid)
+                        cursor.execute(sql_change_size,sql_where)
+                    # there are no sizeid (we have to create it)
+                    else:
+                        _namesize = i['namesize']
+                        _price = i['price']
+
+                        sql_create_size = """
+                        INSERT INTO
+                            sizes(namesize,price,drinkid)
+                        VALUES(%s,%s,%s)
+                        """
+                        sql_where = (_namesize,_price,_drinkid)
+                        cursor.execute(sql_create_size,sql_where)
+            else:
+                resp = jsonify({'message':"Missing input - You have to add size of drink!!"})
+                resp.status_code = 400
+                return resp
+            
+            # change topping of drink (if any)
+            if _toppingArr != []:
+                # If the request body has toppingid means that it already exists in the system
+                # otherwise it doesn't exists and we have to create it in DB
+                for i in _toppingArr:
+                    # there are topping (we just change it)
+                    if "toppingid" in i:
+                        _toppingid = i['toppingid']
+                        _nametopping = i['nametopping']
+                        _price = i['price']
+
+                        sql_change_topping = """
+                        UPDATE
+                            toppings
+                        SET
+                            nametopping = %s, price = %s
+                        WHERE
+                            toppingid = %s
+                        """
+                        sql_where = (_nametopping,_price,_toppingid)
+                        cursor.execute(sql_change_topping,sql_where)
+                    # there are no toppingid (we have to create it)
+                    else:
+                        _nametopping = i['nametopping']
+                        _price = i['price']
+                        # we have create topping in toppings table
+                        # get toppingid and save it in drinktopping table
+                        sql_create_topping = """
+                        INSERT INTO
+                            toppings(nametopping,price)
+                        VALUES(%s,%s)
+                        RETURNING toppingid
+                        """
+                        sql_where = (_nametopping,_price)
+                        cursor.execute(sql_create_topping,sql_where)
+                        row = cursor.fetchone()
+                        toppingid = row[0]
+                        # save toppingid to drinktopping table
+                        sql_add_drinktopping = """
+                        INSERT INTO
+                            drinktopping(drinkid,toppingid)
+                        VALUES(%s,%s)
+                        """
+                        sql_where = (_drinkid,toppingid)
+                        cursor.execute(sql_add_drinktopping,sql_where)
+
+            conn.commit()
             cursor.close()
-            orderInfo = [{"orderid":i["orderid"],"userid":i["userid"],"totalprice":i["totalprice"],
-                            "address":i["address"],"phonenumber":i["phonenumber"],"note":i["note"],
-                            "orderdate":i["orderdate"]} for i in row]
-            resp = jsonify(orderInfo=orderInfo)
+            resp = jsonify({'message':"Update success!"})
+            resp.status_code = 200
+            return resp
+
+        elif request.method == 'DELETE':
+            sql_detete_drink = """
+            UPDATE drinks
+            SET status = 'Unvailable'
+            WHERE drinkid = %s
+            """
+            sql_where = (drinkid,)
+            cursor.execute(sql_detete_drink,sql_where)
+            conn.commit()
+            cursor.close()
+
+            resp = jsonify({'message':"Delete Successfully!!"})
             resp.status_code = 200
             return resp
         else:
-            resp = jsonify({'message':"Parameter is not defined!"})
-            resp.status_code = 400
+            resp = jsonify({'message':"Not Implemented!!"})
+            resp.status_code = 501
             return resp
     else:
         resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
