@@ -972,15 +972,20 @@ def createDrink():
         drinkid = row[0]
 
         # add info size
-        for i in _sizeArr:
-            sql_add_size = """
-            INSERT INTO sizes(namesize,price,drinkid) VALUES(%s,%s,%s)
-            """
-            sql_where = (i['namesize'],i['price'],drinkid)
-            cursor.execute(sql_add_size,sql_where)
+        if _sizeArr != []:
+            for i in _sizeArr:
+                sql_add_size = """
+                INSERT INTO sizes(namesize,price,drinkid) VALUES(%s,%s,%s)
+                """
+                sql_where = (i['namesize'],i['price'],drinkid)
+                cursor.execute(sql_add_size,sql_where)
+        else:
+            resp = jsonify({'message':"Missing input - You have to add size of drink!!"})
+            resp.status_code = 400
+            return resp
 
         # add info topping(if any)
-        if _toppingArr != None:
+        if _toppingArr != []:
             # add info topping to toppings table
             lst_toppingid = []
             for i in _toppingArr:
