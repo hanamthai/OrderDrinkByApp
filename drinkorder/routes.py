@@ -371,14 +371,11 @@ def createOrder():
         return resp
     
 
-# Cancelled order
-@app.route('/order/cancel', methods = ['PUT'])
+# user cancelled order
+@app.route('/order/cancel/<int:orderid>', methods = ['PUT'])
 @jwt_required()
-def cancelledOrder():
+def usercancelledOrder(orderid):
     userid = get_jwt_identity()
-
-    _json = request.json
-    _orderid = _json['orderid']
 
     # check orderid already exists and it have a 'Initialize' or 'Preparing' status 
     # then system allows for cancel order 
@@ -394,7 +391,7 @@ def cancelledOrder():
             (status = %s OR status = %s)
     """
 
-    sql_where = (_orderid,userid,'Initialize','Preparing')
+    sql_where = (orderid,userid,'Initialize','Preparing')
     cursor.execute(sql_check_constraint,sql_where)
     row = cursor.fetchone()
 
@@ -405,7 +402,7 @@ def cancelledOrder():
         SET status = %s
         WHERE orderid = %s
         """
-        sql_where = ('Cancelled',_orderid)
+        sql_where = ('Cancelled',orderid)
         cursor.execute(sql_cancel,sql_where)
         conn.commit()
         cursor.close()
@@ -421,96 +418,11 @@ def cancelledOrder():
 
 
 
-
-# add and update size
-@app.route('/admin/size', methods=['POST','PUT'])
-@jwt_required()
-def addAndUpdateSize():
-    info = get_jwt()
-    rolename = info['rolename']
-    if rolename == 'admin':
-        if request.method == 'POST':
-            _json = request.json
-            _namesize = _json['namesize']
-            _price = _json['price']
-
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            sql_add_size = """
-            INSERT INTO sizes(namesize,price)
-            VALUES(%s,%s)
-            """
-            sql_where = (_namesize,_price)
-            cursor.execute(sql_add_size,sql_where)
-            conn.commit()
-            cursor.close()
-            resp = jsonify({"message":"Added size!"})
-            resp.status_code = 200
-            return resp
-        
-        elif request.method == 'PUT':
-            _json = request.json()
-            _sizeid = _json['sizeid']
-            _namesize = _json['namesize']
-            _price = _json['price']
-
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            sql_update_size = """
-            UPDATE sizes
-            SET namesize = %s,
-                price = %s
-            WHERE sizeid = %s
-            """
-            sql_where = (_namesize,_price,_sizeid)
-            cursor.execute(sql_update_size,sql_where)
-            conn.commit()
-            cursor.close()
-            resp = jsonify({"message":"Updated size!"})
-            resp.status_code = 200
-            return resp
-    else:
-        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
-        resp.status_code = 401
-        return resp
-
-
-# admin updates order status to 'Delivering'
-@app.route('/admin/order/update',methods=['PUT'])
-@jwt_required()
-def orderStatusUpdate():
-    info = get_jwt()
-    rolename = info['rolename']
-    
-    if rolename == 'admin':
-        _json = request.json
-        orderid = _json['orderid']
-
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        sql = """
-        UPDATE orders
-        SET status = 'Delivering'
-        WHERE orderid = %s
-        """
-        sql_where = (orderid,)
-        cursor.execute(sql,sql_where)
-        conn.commit()
-        cursor.close()
-        resp = jsonify({"message":"Updated order status to 'Delivering'!"})
-        resp.status_code = 200
-        return resp
-    
-    else:
-        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
-        resp.status_code = 401
-        return resp
-
-
 # user confirm the order is 'Completed'
-@app.route('/order/complete',methods=['PUT'])
+@app.route('/order/complete/<int:orderid>',methods=['PUT'])
 @jwt_required()
-def userConfirmCompletedOrder():
+def userConfirmCompletedOrder(orderid):
     userid = get_jwt_identity()
-    _json = request.json
-    orderid = _json['orderid']
 
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     # check order status is 'Delivering'or not.
@@ -544,13 +456,11 @@ def userConfirmCompletedOrder():
 
 
 
-### admin and user view order history or current 
+# user view order history or current 
 @app.route('/order/<status>', methods = ['GET'])
 @jwt_required()
 def userOrderHistory(status):
     userid = get_jwt_identity()
-    data = get_jwt()
-    rolename = data['rolename']
 
     orderstatus = []
     if status == 'history':
@@ -567,30 +477,17 @@ def userOrderHistory(status):
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         
         # user get order 'history' or 'current'
-        if rolename == 'user':
-            sql_history = """
-            SELECT 
-                orderid,status,address,orderdate,totalprice
-            FROM orders
-            WHERE 
-                userid = %s 
-                    AND 
-                (status = %s OR status = %s)
-            ORDER BY orderdate DESC
-            """
-            sql_where = (userid,orderstatus[0],orderstatus[1])
-        
-        # admin get order 'history' or 'current'
-        elif rolename == 'admin':
-            sql_history = """
-            SELECT 
-                orderid,status,address,orderdate,totalprice
-            FROM orders
-            WHERE 
-                (status = %s OR status = %s)
-            ORDER BY orderdate DESC
-            """
-            sql_where = (orderstatus[0],orderstatus[1])
+        sql_history = """
+        SELECT 
+            orderid,status,address,orderdate,totalprice
+        FROM orders
+        WHERE 
+            userid = %s 
+                AND 
+            (status = %s OR status = %s)
+        ORDER BY orderdate DESC
+        """
+        sql_where = (userid,orderstatus[0],orderstatus[1])
 
         cursor.execute(sql_history,sql_where)
         row = cursor.fetchall()
@@ -658,44 +555,6 @@ def userOrderHistory(status):
         return resp
 
 
-# user "Cancelled" order
-@app.route('/order/current/cancel', methods=['PUT'])
-@jwt_required()
-def userCancelledOrder():
-    userid = get_jwt_identity()
-    _json = request.json
-    orderid = _json['orderid']
-
-    # Check orders must be in "Preparing" status to be "Cancelled"
-    cursor = conn.cursor(cursor_factory= psycopg2.extras.DictCursor)
-    sql_check_status = """
-    SELECT orderid FROM orders WHERE (orderid = %s AND status = %s)
-    """
-    sql_where = (orderid,'Preparing')
-    cursor.execute(sql_check_status,sql_where)
-    data = cursor.fetchone()
-
-    if data == None:
-        resp = jsonify({"message":"You can not Cancel Order!!"})
-        resp.status_code = 400
-        return resp
-    else:
-        # Change order status from "Delivering" to "Cancelled"
-        sql_change_status_order = """
-        UPDATE orders
-        SET status = %s
-        WHERE orderid = %s
-        """
-        sql_where = ('Cancelled',orderid)
-        cursor.execute(sql_change_status_order,sql_where)
-        conn.commit()
-        cursor.close()
-
-        resp = jsonify({"message":"Cancelled order!!"})
-        resp.status_code = 200
-        return resp
-
-
 
 @app.route('/changePassword',methods=['PUT'])
 @jwt_required()
@@ -737,11 +596,10 @@ def changePassword():
         resp.status_code = 400
         return resp
 
-
+#{{HOST}}/resetPassword?email=<Your email>
 @app.route('/resetPassword',methods = ['POST'])
 def resetRequest():
-    _json = request.json
-    _email = _json['email']
+    _email = request.args.get('email')
     
     # check email request has contained in the database
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -811,6 +669,46 @@ def verifyTokenEmail():
 
 
 # admin management
+## admin updates order status to 'Delivering'
+@app.route('/admin/order/update/<int:orderid>',methods=['PUT'])
+@jwt_required()
+def orderStatusUpdate(orderid):
+    info = get_jwt()
+    rolename = info['rolename']
+    
+    if rolename == 'admin':
+        # check order status is 'Preparing'or not.
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        sql_check_preparing = """
+        SELECT orderid FROM orders
+        WHERE orderid = %s AND status = %s
+        """
+        sql_where = (orderid,'Preparing')
+        cursor.execute(sql_check_preparing,sql_where)
+        row = cursor.fetchone()
+        if row:
+            sql = """
+            UPDATE orders
+            SET status = 'Delivering'
+            WHERE orderid = %s
+            """
+            sql_where = (orderid,)
+            cursor.execute(sql,sql_where)
+            conn.commit()
+            cursor.close()
+            resp = jsonify({"message":"Updated order status to 'Delivering'!"})
+            resp.status_code = 200
+            return resp
+        else:
+            cursor.close()
+            resp = jsonify({"message":"You're cannot change the order status to 'Delivering'!"})
+            resp.status_code = 400
+            return resp
+    else:
+        resp = jsonify({"message":"Unauthorized - You are not authorized!"})
+        resp.status_code = 401
+        return resp
+
 ## get customer info
 @app.route('/admin/customer/info',methods=['GET'])
 @jwt_required()
@@ -841,14 +739,11 @@ def getCustomerInfo():
 
 
 ## Lock and unlock customer accounts
-@app.route('/admin/customer/status', methods = ['PUT'])
+@app.route('/admin/customer/status/<int:userid>', methods = ['PUT'])
 @jwt_required()
-def changeCustomerStatus():
+def changeCustomerStatus(userid):
     data = get_jwt()
     rolename = data['rolename']
-
-    _json = request.json
-    userid = _json['userid']
 
     if rolename == 'admin':
         cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -868,13 +763,13 @@ def changeCustomerStatus():
             _status = 'active'
 
         # change user status
-        sql_inactive_status = """
+        sql_change_status = """
         UPDATE users
         SET status = %s
         WHERE userid = %s
         """
         sql_where = (_status,userid)
-        cursor.execute(sql_inactive_status,sql_where)
+        cursor.execute(sql_change_status,sql_where)
         conn.commit()
         cursor.close()
         resp = jsonify({'message':'Changed customer account status!!'})
@@ -968,7 +863,7 @@ def createDrink():
         resp.status_code = 401
         return resp
 
-## Update and detete
+## Update and detete drink
 @app.route('/admin/drink/<int:drinkid>', methods = ['PUT', 'DELETE'])
 @jwt_required()
 def admimGetAllDrink(drinkid):
@@ -1113,6 +1008,157 @@ def admimGetAllDrink(drinkid):
         return resp
 
 
+## admin view order history or current 
+@app.route('/admin/order/<status>', methods = ['GET'])
+@jwt_required()
+def adminOrderHistory(status):
+    data = get_jwt()
+    rolename = data['rolename']
+
+    if rolename != 'admin':
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+
+    orderstatus = []
+    if status == 'history':
+        orderstatus=['Completed','Cancelled']
+    elif status == 'current':
+        orderstatus=['Preparing','Delivering']
+
+    if orderstatus == []:
+        resp = jsonify({"message":"Bad Request!!"})
+        resp.status_code = 400
+        return resp
+
+    try:
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        
+        # admin get order 'history' or 'current'
+        sql_history = """
+        SELECT 
+            orderid,status,address,orderdate,totalprice
+        FROM orders
+        WHERE 
+            (status = %s OR status = %s)
+        ORDER BY orderdate DESC
+        """
+        sql_where = (orderstatus[0],orderstatus[1])
+
+        cursor.execute(sql_history,sql_where)
+        row = cursor.fetchall()
+        data = [{"orderid":i["orderid"],"status":i["status"],"address":i["address"],
+                "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
+                for i in row]
+        
+        # get order detail
+        lst_orderid = [i["orderid"] for i in row]
+        all_order_detail = []
+
+        for i in lst_orderid:
+            sql_order_detail = """
+            SELECT 
+                drinkname, itemquantity,namesize,nametopping
+            FROM 
+                itemorder as io
+            INNER JOIN 
+                items as i
+            ON
+                io.itemid = i.itemid
+            INNER JOIN 
+                drinks as d
+            ON
+                d.drinkid = i.drinkid
+            INNER JOIN
+                sizes as s
+            ON 
+                s.sizeid = i.sizeid
+            LEFT JOIN
+                itemtopping as it
+            ON
+                it.itemid = i.itemid
+            LEFT JOIN 
+                toppings as t
+            ON
+                t.toppingid = it.toppingid
+            WHERE orderid = %s
+            """
+            sql_where = (i,)
+            cursor.execute(sql_order_detail,sql_where)
+            orderdetail = cursor.fetchall()
+            all_order_detail.append(orderdetail)
+
+        # format all_order_detail
+        all_order_detail_format = []
+        for i in range(len(all_order_detail)):
+            result = ", ".join([f"{sublist[0]} (x{sublist[1]})" for sublist in all_order_detail[i]]) + ", size " + ", ".join(set([sublist[2] for sublist in all_order_detail[i]]))
+            topping = [sublist[3] for sublist in all_order_detail[i] if sublist[3] is not None]
+            if topping:
+                result += ", topping: " + ", ".join([sublist[3] for sublist in all_order_detail[i] if sublist[3] is not None])
+            all_order_detail_format.append(result)
+        # add order detail
+        for i in range(len(data)):
+            data[i].update({"orderdetail":all_order_detail_format[i]})
+
+        cursor.close()
+        resp = jsonify(data=data)
+        resp.status_code = 200
+        return resp
+
+    except:
+        resp = jsonify({"message":"Internal Server Error!!"})
+        resp.status_code = 500
+        return resp
+
+
+## admin cancelled order
+@app.route('/admin/order/cancel/<int:orderid>', methods = ['PUT'])
+@jwt_required()
+def adminCancelledOrder(orderid):
+    data = get_jwt()
+    rolename = data['rolename']
+
+    if rolename != 'admin':
+        resp = jsonify({'message':"Unauthorized - You are not authorized!!"})
+        resp.status_code = 401
+        return resp
+    
+    # check orderid already exists and it have a 'Preparing' status 
+    # then system allows for cancel order 
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    
+    sql_check_constraint = """
+    SELECT orderid FROM orders
+    WHERE
+        orderid = %s
+        AND
+        status = %s
+    """
+
+    sql_where = (orderid,'Preparing')
+    cursor.execute(sql_check_constraint,sql_where)
+    row = cursor.fetchone()
+
+    if row:
+        # update order status to 'Cancelled'
+        sql_cancel = """
+        UPDATE orders
+        SET status = %s
+        WHERE orderid = %s
+        """
+        sql_where = ('Cancelled',orderid)
+        cursor.execute(sql_cancel,sql_where)
+        conn.commit()
+        cursor.close()
+        resp = jsonify({"message":"Order status updated to 'Cancelled'!"})
+        resp.status_code = 200
+        return resp
+
+    else:
+        cursor.close()
+        resp = jsonify({"message":"Order cannot cancel"})
+        resp.status_code = 400
+        return resp
 
 ## revenue statistics by day or month or year
 @app.route('/admin/revenue', methods=['GET'])
