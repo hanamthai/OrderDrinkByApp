@@ -54,4 +54,10 @@ conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER,
                         password=DB_PASS, host=DB_HOST)
 
 # Avoid circular import
-from drinkorder import routes
+from drinkorder.users.routes import users
+from drinkorder.admins.routes import admins
+from drinkorder.general.routes import general
+
+app.register_blueprint(users)
+app.register_blueprint(admins)
+app.register_blueprint(general)
