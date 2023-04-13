@@ -1,9 +1,10 @@
-from flask import jsonify, request, Blueprint
-
+from flask import jsonify, request, session, Blueprint
+import bcrypt
 from drinkorder import conn
 from drinkorder import psycopg2
 
 from flask_jwt_extended import jwt_required
+from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt
 from drinkorder import format_timestamp as ft
 
@@ -12,6 +13,64 @@ admins = Blueprint('admins','__name__')
 
 
 # management
+
+# Create a route to authenticate your admins and return token.
+@admins.route('/admin/login', methods=['POST'])
+def login():
+    _json = request.json
+    # validate the received values
+    if 'phonenumber' in _json.keys() and 'password' in _json.keys():
+        _phonenumber = _json['phonenumber']
+        _password = _json['password']
+        # check admin exists
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        sql = """
+        SELECT 
+            userid,password,rolename,status
+        FROM 
+            users 
+        WHERE 
+            phonenumber = %s 
+        AND 
+            rolename = %s
+        """
+        sql_where = (_phonenumber,'admin')
+
+        cursor.execute(sql, sql_where)
+        row = cursor.fetchone()
+        cursor.close()
+        if row:
+            password_hash = row['password']
+            userid = row['userid']
+            rolename = row['rolename']
+            status = row['status']
+            if status == 'inactive':
+                resp = jsonify({"message":"Locked - Your account is locked! You can contact with our employee to know reason!"})
+                resp.status_code = 423
+                return resp
+            elif bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
+                # create token
+                additional_claims = {"rolename":rolename}
+                access_token = create_access_token(identity=userid,additional_claims=additional_claims)
+                session['access_token'] = access_token
+                resp = jsonify(access_token=access_token)
+                resp.status_code = 200
+                return resp
+            else:
+                resp = jsonify({'message': 'Bad Request - Wrong password!'})
+                resp.status_code = 400
+                return resp
+        else:
+            resp = jsonify({'message': 'Bad Request - Your account does not exist in the system!'})
+            resp.status_code = 400
+            return resp
+    else:
+        resp = jsonify({'message': 'Bad Request - Missing input!'})
+        resp.status_code = 400
+        return resp
+
+
 ## admin updates order status to 'Delivering'
 @admins.route('/admin/order/update/<int:orderid>',methods=['PUT'])
 @jwt_required()

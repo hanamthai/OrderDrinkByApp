@@ -15,7 +15,7 @@ from drinkorder import timedelta
 general = Blueprint('general','__name__')
 
 
-# Create a route to authenticate your users and admins and return token.
+# Create a route to authenticate your users and return token.
 @general.route('/login', methods=['POST'])
 def login():
     _json = request.json
