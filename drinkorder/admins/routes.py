@@ -450,7 +450,7 @@ def adminOrderHistory(status):
         cursor.execute(sql_history,sql_where)
         row = cursor.fetchall()
         data = [{"orderid":i["orderid"],"status":i["status"],"address":i["address"],
-                "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":i["totalprice"]} 
+                "orderdate":ft.format_timestamp(str(i["orderdate"])),"totalprice":float(i["totalprice"])} 
                 for i in row]
         
         # get order detail

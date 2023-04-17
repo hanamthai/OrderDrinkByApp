@@ -128,7 +128,7 @@ def home():
     row = cursor.fetchall()
     cursor.close()
     drinks = [{'drinkid': drink[0], 'drinkname': drink[1], 'drinkimage': drink[2],
-                'categoryid': drink[3],'price':drink[4] ,'status': drink[5]} for drink in row]
+                'categoryid': drink[3],'price':float(drink[4]) ,'status': drink[5]} for drink in row]
     if drinks == None:
         resp = jsonify({'message':"Items not found!!"})
         resp.status_code = 400
@@ -188,14 +188,14 @@ def drinkdetail(id):
     cursor.execute(sql_topping,sql_where)
     topping = cursor.fetchall()
     if topping != None:
-        _topping = [{"toppingid": i['toppingid'], "nametopping": i['nametopping'], "price": i['price']} for i in topping]
+        _topping = [{"toppingid": i['toppingid'], "nametopping": i['nametopping'], "price": float(i['price'])} for i in topping]
     else:
         _topping = []
     # size
     cursor.execute(sql_size,sql_where)
     size = cursor.fetchall()
     if size != None:
-        _size = [{"sizeid": j['sizeid'], "namesize": j['namesize'], "price": j['price']} for j in size]
+        _size = [{"sizeid": j['sizeid'], "namesize": j['namesize'], "price": float(j['price'])} for j in size]
     else:
         _size = []
     cursor.close()
