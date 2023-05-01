@@ -230,12 +230,48 @@ def category_info():
 # send email to reset password
 def sendEmail(userid,_email):
     token = create_access_token(identity=userid,expires_delta=timedelta(minutes=5))
-    msg = Message('YÊU CẦU ĐẶT LẠI MẬT KHẨU',recipients=[_email],sender='noreply@gmail.com')
-
-    msg.body = f""" Để đặt lại mật khẩu trong ứng dụng đặt đồ uống. Hãy nhấn vào link dưới đây:
-    {url_for("general.verifyTokenEmail",jwt=token,_external=True)}
-    Nếu bạn không phải là người gửi yêu cầu đổi mật khẩu. Hãy bỏ qua mail thông báo này.
+    html_content = f""" 
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <link rel="stylesheet" type="text/css" hs-webfonts="true" href="https://fonts.googleapis.com/css?family=Lato|Lato:i,b,bi">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style type="text/css">
+          h1{{font-size:56px}}
+          p{{font-weight:100}}
+          td{{vertical-align:top}}
+          #email{{margin:auto;width:600px;background-color:#fff}}
+        </style>
+    </head>
+    <body bgcolor="#F5F8FA" style="width: 100%; font-family: "Helvetica Neue", Helvetica, sans-serif; font-size:18px;">
+    <div id="email">
+        <table role="presentation" width="100%">
+            <tr>
+                <td bgcolor="#F6AC31" align="center" style="color: white;">
+                    <h1> Ứng Dụng<br> Đặt Đồ Uống!</h1>
+                </td>
+        </table>
+        <table role="presentation" border="0" cellpadding="0" cellspacing="10px" style="padding: 30px 30px 30px 60px;">
+            <tr>
+                <td>
+                    <h2>
+                        Để đặt lại mật khẩu trong ứng dụng đặt đồ uống online. Hãy nhấn vào link dưới đây:
+                        <a href={url_for("general.verifyTokenEmail",jwt=token,_external=True)}>
+                            <br>Bấm vào đây!
+                        </a>
+                    </h2>
+                    <p>
+                        Nếu bạn không phải là người gửi yêu cầu đổi mật khẩu. Hãy bỏ qua mail thông báo này.
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </div>
+    </body>
+    </html>
     """
+    msg = Message('YÊU CẦU ĐẶT LẠI MẬT KHẨU', sender='noreply@gmail.com', recipients=[_email], html=html_content)
     mail.send(msg)
 
 #{{HOST}}/resetPassword?email=<Your email>
