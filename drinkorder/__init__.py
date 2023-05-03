@@ -5,6 +5,8 @@ import psycopg2  # pip install psycopg2
 import psycopg2.extras
 
 from flask_jwt_extended import JWTManager
+import redis    # check if a JWT has been revoked
+
 from datetime import timedelta
 
 from flask_mail import Mail
@@ -26,6 +28,7 @@ jwt = JWTManager(app)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=60)
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=1)
 # send email setup
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465

@@ -3,7 +3,9 @@ import bcrypt
 from flask_mail import Message
 
 from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt
 from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_refresh_token
 from flask_jwt_extended import jwt_required
 
 from drinkorder import mail
@@ -42,11 +44,12 @@ def login():
                 resp.status_code = 423
                 return resp
             elif bcrypt.checkpw(_password.encode('utf-8'), password_hash.encode('utf-8')):
-                # create token
+                # create token and refresh token
                 additional_claims = {"rolename":rolename}
                 access_token = create_access_token(identity=userid,additional_claims=additional_claims)
+                refresh_token = create_refresh_token(identity=userid,additional_claims=additional_claims)
                 session['access_token'] = access_token
-                resp = jsonify(access_token=access_token)
+                resp = jsonify(access_token=access_token,refresh_token=refresh_token)
                 resp.status_code = 200
                 return resp
             else:
@@ -61,6 +64,15 @@ def login():
         resp = jsonify({'message': 'Bad Request - Missing input!'})
         resp.status_code = 400
         return resp
+
+
+@general.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    userid = get_jwt_identity
+    additional_claims = get_jwt()
+    access_token = create_access_token(identity=userid, additional_claims=additional_claims)
+    return jsonify(access_token=access_token)
 
 
 @general.route('/register', methods=['POST'])
