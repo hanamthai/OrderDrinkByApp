@@ -64,7 +64,7 @@ python run.py
 - [Postman](https://documenter.getpostman.com/view/21836660/2s93CGTGtg)
 
 ## :eight: Diagram:
-- [DIAGRAM](https://app.diagrams.net/#G1vMdpU-4lPApqw8HGCJUiXssT3Tkvx9ho)
+- [DIAGRAM]([https://app.diagrams.net/#G1vMdpU-4lPApqw8HGCJUiXssT3Tkvx9ho](https://drive.google.com/file/d/1AiLl_kz9jkrUQPtZM0DK8T85UhhmoLfc/view?usp=share_link))
 
 ## :nine: Design UI:
 - [FIGMA](https://www.figma.com/file/jX4vZYVWdz6aNG0L7PjOtR/Order-app?node-id=0-1&t=s7YSduKpxu5xV4hT-0)
