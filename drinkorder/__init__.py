@@ -5,7 +5,6 @@ import psycopg2  # pip install psycopg2
 import psycopg2.extras
 
 from flask_jwt_extended import JWTManager
-import redis    # check if a JWT has been revoked
 
 from datetime import timedelta
 
