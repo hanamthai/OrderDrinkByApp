@@ -7,6 +7,6 @@ from drinkorder import app
 if __name__ == "__main__":
     app.run(
         debug=True,
-        host=os.environ.get('IP') or '0.0.0.0' ,
+        host=os.environ.get('IP') or '0.0.0.0',
         port=int(os.environ.get('PORT') or 5000)
     )
